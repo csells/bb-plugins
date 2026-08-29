@@ -1,0 +1,30 @@
+.project-files-shell {
+  container-type: inline-size;
+}
+.project-file-row {
+  min-height: 2.25rem;
+  padding-left: calc(0.35rem + var(--tree-depth, 0) * 1.1rem);
+}
+
+.project-files-skeleton {
+  animation: project-files-pulse 1.45s ease-in-out infinite;
+}
+
+@keyframes project-files-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.8; }
+}
+
+@media (pointer: coarse) {
+  .project-file-row {
+    min-height: 2.75rem;
+    padding-left: calc(0.25rem + var(--tree-depth, 0) * 1rem);
+    font-size: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-files-skeleton {
+    animation: none;
+  }
+}
