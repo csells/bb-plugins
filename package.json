@@ -7,8 +7,8 @@
     "plugins/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace bb-plugin-project-files",
-    "test": "npm run test --workspace bb-plugin-project-files",
-    "typecheck": "npm run typecheck --workspace bb-plugin-project-files"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }

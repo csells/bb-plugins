@@ -14,6 +14,17 @@ Install the local checkout:
 ```sh
 bb plugin install path:. --plugin project-files
 ```
+
+## Auto Pin
+
+`plugins/auto-pin` automatically pins future visible root threads, including
+visible root forks. It ignores hidden threads, child threads, and threads that
+are already pinned.
+
+```sh
+bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin auto-pin
+```
+
 Development commands:
 
 ```sh

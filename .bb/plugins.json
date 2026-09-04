@@ -4,6 +4,10 @@
   "name": "csells-bb-plugins",
   "plugins": [
     {
+      "name": "auto-pin",
+      "source": "./plugins/auto-pin"
+    },
+    {
       "name": "project-files",
       "source": "./plugins/project-files"
     }
