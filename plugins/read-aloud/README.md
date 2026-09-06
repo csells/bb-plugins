@@ -92,10 +92,12 @@ drops its text label first on narrow screens so the controls always fit.
 
 ## Known limitations
 
-- **Forward seek is bounded by the buffer.** The response is chunked with no
-  `Content-Length`, so the element has no duration and cannot seek past what it
-  already holds. Backward always works; the forward button disables itself when
-  there is nothing buffered to jump into.
+- **Seeking is clamped against `seekable`, not `buffered`.** The response is
+  chunked with no `Content-Length`, so `duration` is `Infinity` — but measured
+  in Chrome, `seekable.end` is `Infinity` too, and a forward seek past the
+  buffered edge lands exactly and keeps playing. Clamping to `buffered` would
+  be wrong: on a stream the browser treats as live it holds only ~2s ahead of
+  the playhead, which pins a 10-second jump to about two.
 - **Not self-contained.** It shells out to a Python `edge-tts`. Making this
   installable by anyone means porting the protocol to Node — the WebSocket and
   its time-based trusted-client token.

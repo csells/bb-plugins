@@ -64,8 +64,6 @@ interface PlayerState {
   label: string;
   error: string | null;
   position: number;
-  /** End of buffered audio — the hard ceiling for forward seeking. */
-  bufferedEnd: number;
   rate: number;
 }
 
@@ -75,7 +73,6 @@ const IDLE: Omit<PlayerState, "rate"> = {
   label: "",
   error: null,
   position: 0,
-  bufferedEnd: 0,
 };
 
 let state: PlayerState = { ...IDLE, rate: 1 };
@@ -115,11 +112,7 @@ function ensureAudio(): HTMLAudioElement {
   element.preservesPitch = true;
 
   const syncProgress = () => {
-    const bufferedEnd =
-      element.buffered.length > 0
-        ? element.buffered.end(element.buffered.length - 1)
-        : 0;
-    setState({ position: element.currentTime, bufferedEnd });
+    setState({ position: element.currentTime });
   };
 
   element.addEventListener("playing", () => {
@@ -177,30 +170,31 @@ function resume(): void {
 }
 
 /**
- * Seeks within what has been received.
+ * Seeks relative to the playhead.
  *
- * The response is chunked with no Content-Length, so the element has no
- * duration and cannot seek past what it already holds. Backward always works;
- * forward is clamped to the buffered edge, which the synth pipeline usually
- * keeps ahead of playback but never guarantees.
+ * Clamp against `seekable`, never `buffered`. The response is chunked with no
+ * Content-Length, so `duration` is Infinity — but measured in Chrome, so is
+ * `seekable.end`, and a forward seek past the buffered edge lands exactly and
+ * keeps playing. `buffered` is the wrong ceiling: on a stream the browser
+ * treats as live it holds only ~2s ahead of the playhead, which would pin a
+ * 10-second jump to about two.
  */
 function seekBy(delta: number): void {
   const element = audio;
   if (element === null) return;
   const ceiling =
-    element.buffered.length > 0
-      ? element.buffered.end(element.buffered.length - 1)
-      : element.currentTime;
-  // Leave a small margin: seeking exactly to the buffered edge can stall.
-  const target = Math.min(
-    Math.max(0, element.currentTime + delta),
-    Math.max(0, ceiling - 0.35),
+    element.seekable.length > 0
+      ? element.seekable.end(element.seekable.length - 1)
+      : Number.POSITIVE_INFINITY;
+  const target = Math.max(
+    0,
+    Math.min(element.currentTime + delta, ceiling),
   );
   try {
     element.currentTime = target;
     setState({ position: target });
   } catch {
-    // Not seekable yet; leave playback untouched.
+    // Some states reject a seek outright; leave playback untouched.
   }
 }
 
@@ -227,7 +221,6 @@ async function speak(input: {
     label: input.label,
     error: null,
     position: 0,
-    bufferedEnd: 0,
   });
 
   try {
@@ -367,9 +360,6 @@ function ReadAloudPlayer() {
 
   const isError = player.status === "error";
   const isBusy = player.status === "loading";
-  // Forward is only possible into audio we already hold.
-  const canSeekForward =
-    !isBusy && player.bufferedEnd - player.position > SEEK_SECONDS * 0.5;
 
   return (
     <div
@@ -448,7 +438,7 @@ function ReadAloudPlayer() {
           <TransportButton
             onClick={() => seekBy(SEEK_SECONDS)}
             label="Forward 10 seconds"
-            disabled={!canSeekForward}
+            disabled={isBusy}
           >
             <span className="size-4 max-md:pointer-coarse:size-5">
               <SeekGlyph forward />
