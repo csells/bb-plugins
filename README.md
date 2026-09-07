@@ -29,7 +29,7 @@ bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin aut
 ## Read Aloud
 
 `plugins/read-aloud` speaks any chat message with a streaming neural voice,
-adding a speaker button beside **Copy message** and a floating transport with
+adding a speaker button to the message action row and a floating transport with
 ±10s seek, playback speed, pause, and stop. It stops itself when you switch
 threads or send a new prompt. Synthesis speaks Microsoft Edge's Read Aloud
 protocol directly, so there is no API key, no metering, and no external

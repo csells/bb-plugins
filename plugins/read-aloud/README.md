@@ -3,7 +3,7 @@
 Speak any chat message out loud, with a streaming neural voice and a real
 transport: seek, speed, pause, stop.
 
-Adds a speaker button to every message's action row, beside **Copy message**.
+Adds a speaker button to every message's action row.
 Click it and a floating pill appears with elapsed time, ±10s seek, pause,
 playback speed, and stop.
 
