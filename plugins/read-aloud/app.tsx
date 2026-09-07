@@ -28,6 +28,32 @@ const STOP_CHANNEL = "read-aloud/stop";
 const SEEK_SECONDS = 10;
 
 /**
+ * Bytes per second of the 24kHz/48kbps stream the server produces, used to turn
+ * a buffer target in seconds into a byte count.
+ */
+const STREAM_BYTES_PER_SECOND = 6000;
+/**
+ * Seconds of audio to hold before playback starts. Playing from the first
+ * appended bytes is fine on localhost and stutters over a tunnel to a phone:
+ * the buffer starts at zero, so the first jitter starves it.
+ *
+ * Measured against a stream that hesitates for 4s right after connecting:
+ * with no cushion, playback starves once for 1.8s of dead silence
+ * mid-sentence; with this cushion, it does not starve at all. The trade is
+ * startup latency — synthesis outruns playback by roughly 4.75x, so at 1.5x
+ * speed this delays first audio by about 1.3s. Silence up front reads as
+ * loading; silence mid-sentence reads as broken.
+ */
+const PREBUFFER_SECONDS = 4;
+/**
+ * The service sends small frames. Appending each one individually means an
+ * updateend round-trip per frame, and appendBuffer runs on the main thread —
+ * exactly the thread that must stay free to keep the media pipeline fed.
+ * Coalescing cuts that churn by roughly an order of magnitude.
+ */
+const APPEND_FLUSH_BYTES = 8192;
+
+/**
  * Playback speed lives in localStorage, not plugin settings. Plugin settings
  * are server-side, global, and read once per load — wrong for a per-client
  * preference the user toggles mid-sentence. This persists instantly and per
@@ -115,6 +141,8 @@ let generation = 0;
 
 /** One element for the whole app, created lazily on first use. */
 let audio: HTMLAudioElement | null = null;
+/** Last whole second pushed to the store, so the clock re-renders once a second. */
+let lastRenderedSecond = -1;
 
 function ensureAudio(): HTMLAudioElement {
   if (audio !== null) return audio;
@@ -123,7 +151,14 @@ function ensureAudio(): HTMLAudioElement {
   // Without this, speeding up a voice raises its pitch.
   element.preservesPitch = true;
 
+  // The clock renders mm:ss, so anything faster than once per second is a
+  // re-render that produces identical output. timeupdate alone fires ~4x a
+  // second and progress fires far more often; on a phone that main-thread
+  // churn competes with appendBuffer.
   const syncProgress = () => {
+    const whole = Math.floor(element.currentTime);
+    if (whole === lastRenderedSecond) return;
+    lastRenderedSecond = whole;
     setState({ position: element.currentTime });
   };
 
@@ -150,7 +185,6 @@ function ensureAudio(): HTMLAudioElement {
   element.addEventListener("waiting", onStarved);
   element.addEventListener("stalled", onStarved);
   element.addEventListener("timeupdate", syncProgress);
-  element.addEventListener("progress", syncProgress);
   element.addEventListener("error", () => {
     // A cleared src reports MEDIA_ELEMENT_ERROR; that is our own teardown.
     if (element.getAttribute("src") === null) return;
@@ -228,24 +262,68 @@ async function feedViaMediaSource(
   }
   const reader = response.body.getReader();
 
-  // Drive the read loop without blocking the caller, so play() can start on
-  // the first appended bytes rather than after the whole synthesis.
+  // Resolved once there is enough audio to start on, or when the stream ends
+  // first — a two-second message must not wait for a four-second cushion.
+  // The Promise executor runs synchronously, so this is assigned before any
+  // caller can reach it — no placeholder body needed.
+  let releasePlayback!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    releasePlayback = resolve;
+  });
+
+  // Playing faster drains the cushion faster, so ask for proportionally more.
+  const target =
+    PREBUFFER_SECONDS * STREAM_BYTES_PER_SECOND * Math.max(1, state.rate);
+  let appendedBytes = 0;
+  let pending: Uint8Array[] = [];
+  let pendingBytes = 0;
+
+  const flush = async () => {
+    if (pendingBytes === 0) return;
+    const batch = new Uint8Array(pendingBytes);
+    let offset = 0;
+    for (const part of pending) {
+      batch.set(part, offset);
+      offset += part.length;
+    }
+    pending = [];
+    pendingBytes = 0;
+    await appended(batch);
+    appendedBytes += batch.length;
+    if (appendedBytes >= target) releasePlayback();
+  };
+
+  // Drive the read loop without blocking the caller: the prebuffer gate below
+  // decides when playback starts, not the end of synthesis.
   void (async () => {
     try {
       for (;;) {
         const { done, value } = await reader.read();
         if (done || signal.aborted) break;
-        if (value.length > 0) await appended(value);
+        if (value.length > 0) {
+          pending.push(value);
+          pendingBytes += value.length;
+          if (pendingBytes >= APPEND_FLUSH_BYTES) await flush();
+        }
       }
+      await flush();
       if (!signal.aborted && mediaSource.readyState === "open") {
         // Sets a finite duration, which makes the whole timeline seekable.
         mediaSource.endOfStream();
       }
+      // Short message, or the stream ended before the cushion filled.
+      releasePlayback();
     } catch {
       // Abort or a mid-stream failure: stop() and the element's error handler
       // own the user-visible outcome from here.
+      releasePlayback();
     }
   })();
+
+  // Hold the caller — and therefore play() — until there is a cushion. The
+  // pill stays on "Preparing" a moment longer in exchange for not starving
+  // three seconds in.
+  await ready;
 }
 
 /**
@@ -255,6 +333,7 @@ async function feedViaMediaSource(
  */
 function stop(): void {
   generation += 1;
+  lastRenderedSecond = -1;
   inFlight?.abort();
   inFlight = null;
   const element = audio;
