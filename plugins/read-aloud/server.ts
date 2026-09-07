@@ -16,7 +16,12 @@
 import { randomUUID } from "node:crypto";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { listVoices, synthesize } from "./synth";
+import {
+  activeClientVersion,
+  configureClientVersion,
+  listVoices,
+  synthesize,
+} from "./synth";
 
 /** Frontend listens on this and stops playback. */
 const STOP_CHANNEL = "read-aloud/stop";
@@ -129,6 +134,28 @@ export default async function plugin(bb: BbPluginApi) {
         'Synthesis speed, e.g. "+8%" or "-10%". Empty means the natural pace. Playback speed is separate, in the player.',
       default: "+8%",
     },
+    clientVersion: {
+      type: "string",
+      label: "Client version override",
+      description:
+        "Advanced. Pin the Sec-MS-GEC client version, e.g. 143.0.3650.75. Leave empty to negotiate automatically, which is almost always right.",
+      default: "",
+    },
+  });
+
+  // Client-version rot handling. The service enforces a minimum version and no
+  // maximum, so a pin that falls below the floor is recoverable by escalating.
+  // Remember whatever worked, so the retry cost is paid once per install
+  // instead of once per synthesis. An explicit override skips negotiation.
+  const LEARNED_VERSION_KEY = "client-version";
+  const initial = await settings.get();
+  configureClientVersion({
+    override: initial.clientVersion,
+    learned: await bb.storage.kv.get<string>(LEARNED_VERSION_KEY),
+    onLearned: (version) => {
+      bb.log.info("negotiated a newer client version", { version });
+      void bb.storage.kv.set(LEARNED_VERSION_KEY, version);
+    },
   });
 
   const jobs = new Map<string, Job>();
@@ -151,7 +178,11 @@ export default async function plugin(bb: BbPluginApi) {
       const { voice, rate } = await settings.get();
       try {
         await probeSynthesis(voice, rate);
-        return { ready: true, voice, detail: "synthesis reachable" };
+        return {
+          ready: true,
+          voice,
+          detail: `synthesis reachable (client ${activeClientVersion()})`,
+        };
       } catch (cause) {
         return {
           ready: false,
@@ -286,6 +317,7 @@ export default async function plugin(bb: BbPluginApi) {
                 "synthesis: reachable (native, no external binary)",
                 `voice:     ${voice}`,
                 `rate:      ${rate || "(natural)"}`,
+                `client:    ${activeClientVersion()}${initial.clientVersion.trim() === "" ? " (negotiated)" : " (pinned)"}`,
               ].join("\n"),
             };
           } catch (cause) {

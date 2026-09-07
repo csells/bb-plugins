@@ -29,6 +29,7 @@ bb read-aloud voices en-GB     # filter the live voice catalog
 | --- | --- | --- |
 | Voice | `en-US-AndrewMultilingualNeural` | Any Microsoft neural voice |
 | Rate | `+8%` | **Synthesis** speed, baked into the audio |
+| Client version override | *(empty)* | Advanced; empty negotiates automatically |
 
 Playback speed is separate and lives in `localStorage`: it is a per-device UI
 preference you change mid-sentence, whereas plugin settings are server-side,
@@ -49,6 +50,26 @@ plugin uninstallable for anyone without that virtualenv. The npm ports were not
 usable either: `edge-tts-node` pins its client version to Chromium 130 and the
 service now refuses that handshake outright (close 1006), while `msedge-tts`
 ships a `preinstall: npx only-allow pnpm` hook that aborts any npm install.
+
+**Client-version rot fixes itself.** The service checks
+`Sec-MS-GEC-Version` against a *minimum* and enforces no maximum. Measured
+directly against the endpoint:
+
+| version | result |  | version | result |
+| --- | --- | --- | --- | --- |
+| `131.0.0.0` | 403 |  | `143.0.3650.75` | OK |
+| `132.0.0.0` | OK |  | `999.0.0.0` | OK |
+
+So the floor sits at 132 while current Edge is ~143 — it ratchets upward but
+lags real releases by roughly a year. Because nothing rejects a *higher*
+version, a stale pin is always recoverable by escalating. On a refused
+handshake the plugin retries with progressively higher majors (+20, +60, +150)
+and remembers whatever worked, so the retry cost is paid once per install
+rather than once per synthesis. That is why `edge-tts-node`'s hard pin at 130
+is permanently broken while this is not. An explicit override is used verbatim
+and never escalated, because a version you set deliberately should mean what it
+says. `bb read-aloud status` reports which version is live and whether it was
+negotiated or pinned.
 
 **One request, streamed.** The service streams a whole request incrementally —
 measured at ~1.5s to first byte and ~4.75x realtime for a six-minute message —
@@ -102,11 +123,9 @@ drops its text label first on narrow screens so the controls always fit.
 
 ## Known limitations
 
-- **The protocol endpoint is undocumented.** There is no SLA, and it has broken
-  before when Microsoft changed the token scheme. `CHROMIUM_VERSION` in
-  `synth.ts` is the single value that rots: if synthesis starts failing with
-  close code 1006, bump it to a current Edge version. `bb read-aloud status`
-  says so in its error output.
+- **The protocol endpoint is undocumented,** so there is no SLA. Client-version
+  rot is handled (see below), but a change to the token scheme itself would
+  need a code change, as it would for every client.
 - Voice catalog only — no cloning, and no control over the 24kHz/48kbps output
   format.
 - Without MSE for mp3, ±10s jumps are limited by how little the browser
