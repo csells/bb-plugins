@@ -74,15 +74,19 @@ export function configureClientVersion(options: {
   if (options.onLearned !== undefined) onVersionLearned = options.onLearned;
 }
 
-function bumpMajor(version: string, by: number): string {
+/** Exported for tests. */
+export function bumpMajor(version: string, by: number): string {
   const parts = version.split(".");
   const major = Number(parts[0]);
   if (!Number.isFinite(major)) return version;
   return [String(major + by), ...parts.slice(1)].join(".");
 }
 
-/** Ordered candidates: an explicit override is used alone and never escalated. */
-function candidateVersions(): string[] {
+/**
+ * Ordered candidates: an explicit override is used alone and never escalated.
+ * Exported for tests.
+ */
+export function candidateVersions(): string[] {
   if (overrideVersion !== null) return [overrideVersion];
   const base = learnedVersion ?? DEFAULT_CLIENT_VERSION;
   return [base, ...ESCALATION_STEPS.map((step) => bumpMajor(base, step))];
@@ -352,7 +356,7 @@ export interface VoiceSummary {
  * Coerces one untrusted JSON value to a string, without the
  * "[object Object]" that String() produces for a non-primitive.
  */
-function asText(value: unknown): string {
+export function asText(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);

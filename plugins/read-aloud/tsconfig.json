@@ -11,6 +11,8 @@
   "include": [
     "server.ts",
     "synth.ts",
+    "synth.test.ts",
+    "server.test.ts",
     "app.tsx",
     "components",
     "lib",

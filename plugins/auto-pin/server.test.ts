@@ -56,4 +56,33 @@ describe("auto-pin", () => {
     expect(pin).not.toHaveBeenCalled();
     await harness.lifecycle.dispose();
   });
+  it("logs a warning instead of failing silently when pinning is rejected", async () => {
+    const pin = vi.fn(async () => {
+      throw new Error("thread is archived");
+    });
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "auto-pin",
+      sdk: { threads: { pin } },
+    });
+    plugin(bb);
+
+    // Thread events are fire-and-forget, so this must not reject.
+    await harness.behavior.emitThreadEvent("thread.created", {
+      thread: makeThreadResponse({
+        id: "thread-unpinnable",
+        visibility: "visible",
+        parentThreadId: null,
+        pinnedAt: null,
+      }),
+    });
+
+    expect(pin).toHaveBeenCalledOnce();
+    const warnings = harness.inspection.logEntries.filter(
+      (entry) => entry.level === "warn",
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain("thread-unpinnable");
+    expect(warnings[0]!.message).toContain("thread is archived");
+    await harness.lifecycle.dispose();
+  });
 });
