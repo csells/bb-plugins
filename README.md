@@ -4,10 +4,11 @@ Personal bb extensions maintained as a multi-plugin repository.
 
 ## Project Files
 
-`plugins/project-files` adds a responsive file browser to bb. It discovers
-standard projects, their configured source directories, and worktree
-environments already associated with project threads. File activation uses
-bb's native preview and installed file-opener system.
+`plugins/project-files` adds a responsive, context-aware file browser to bb.
+Open it from a thread's folder action or from **Project Files** in the New Tab
+menu. Existing threads browse their exact environment; New Thread follows the
+project currently selected in bb. File activation uses bb's native preview and
+installed file-opener system.
 
 Install the local checkout:
 

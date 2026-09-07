@@ -2,14 +2,15 @@
 
 A responsive, read-only file browser for bb projects.
 
-Project Files adds a **Project Files** panel to bb's sidebar. It discovers
-configured project source directories and worktree environments associated
-with project threads, then presents them as a searchable tree. Selecting a
-file delegates to bb's native file preview and installed file openers.
+Project Files adds a context-aware **Project Files** tab to bb's thread and
+New Thread panels. Existing threads browse their exact environment; New Thread
+follows the project currently selected in bb. Selecting a file delegates to
+bb's native file preview and installed file openers.
 
 ## Features
 
-- Switch between bb projects and their known source directories or worktrees.
+- Follow the current bb thread or selected New Thread project automatically.
+- Switch workspaces only when a project has more than one available source.
 - Search file and folder names without losing their hierarchy.
 - Hide generated directories such as `.git`, `node_modules`, `dist`, and
   `coverage` by default, with a control to reveal them.
@@ -44,7 +45,7 @@ The build emits the server and application bundles under `dist/`.
 
 - `server.ts` discovers projects and workspaces and lists their paths through
   bb's host-aware SDK.
-- `app.tsx` builds the project/workspace controls and file tree.
+- `app.tsx` contributes project-aware panel actions and builds the file tree.
 - `app.css` owns the responsive desktop, mobile, and coarse-pointer layouts.
 - `server.test.ts` and `app.test.tsx` cover path behavior, discovery, filtering,
   tree synthesis, sorting, and app registration.

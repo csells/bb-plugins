@@ -10,6 +10,22 @@ beforeAll(async () => {
   ({ buildFileTree } = await import("./app"));
 });
 
+function project(id: string, name: string, environmentId: string) {
+  return {
+    id,
+    name,
+    kind: "standard" as const,
+    workspaces: [{
+      kind: "environment" as const,
+      id: `environment:${environmentId}`,
+      environmentId,
+      hostId: "host-1",
+      label: `${name} worktree`,
+      detail: "main · Studio",
+    }],
+  };
+}
+
 describe("file tree", () => {
   it("synthesizes missing parents and sorts folders before files", () => {
     const tree = buildFileTree([
@@ -23,18 +39,24 @@ describe("file tree", () => {
     expect(tree[0]?.children[0]?.path).toBe("src/main.ts");
   });
 
-  it("renders project controls and the responsive browser shell", async () => {
-    const slot = renderSlot(app.navPanels[0]!, { subPath: "" }, {
-      context: { projectId: "project-1", threadId: null },
+  it("registers project-aware surfaces instead of a global navigation page", () => {
+    expect(app.navPanels).toHaveLength(0);
+    expect(app.threadPanelActions).toHaveLength(1);
+    expect(app.newThreadPanelActions).toHaveLength(1);
+    expect(app.threadHeaderActions).toHaveLength(1);
+  });
+
+  it("locks an existing thread to its active environment", async () => {
+    const slot = renderSlot(app.threadPanelActions[0]!, {
+      threadId: "thread-1",
+      params: null,
+    }, {
+      context: { projectId: "project-1", threadId: "thread-1" },
       rpc: {
         browser_bootstrap: () => ({
-          projects: [{
-            id: "project-1", name: "Apollo", kind: "standard",
-            workspaces: [{
-              kind: "environment", id: "environment:env-1", environmentId: "env-1",
-              hostId: "host-1", label: "Main worktree", detail: "main · Studio",
-            }],
-          }],
+          project: project("project-1", "Apollo", "env-1"),
+          selectedWorkspaceId: "environment:env-1",
+          workspaceLocked: true,
         }),
         browser_paths: () => ({
           truncated: false,
@@ -42,9 +64,45 @@ describe("file tree", () => {
         }),
       },
     });
-    expect(await slot.findByLabelText("Project")).toBeTruthy();
-    expect(await slot.findByLabelText("Workspace")).toBeTruthy();
+
     expect(await slot.findByText("README.md")).toBeTruthy();
+    expect(slot.queryByLabelText("Project")).toBeNull();
+    expect(slot.queryByLabelText("Workspace")).toBeNull();
+    expect(slot.container.querySelector(".project-files-shell")).not.toBeNull();
+    slot.lifecycle.unmount();
+  });
+
+  it("follows a changed project scope without retaining the previous workspace", async () => {
+    const registration = app.newThreadPanelActions[0]!;
+    const slot = renderSlot(registration, { projectId: "project-1", params: null }, {
+      context: { projectId: "project-1", threadId: null },
+      rpc: {
+        browser_bootstrap: ({ projectId }) => {
+          const current = projectId === "project-2"
+            ? project("project-2", "Gemini", "env-2")
+            : project("project-1", "Apollo", "env-1");
+          return {
+            project: current,
+            selectedWorkspaceId: current.workspaces[0]!.id,
+            workspaceLocked: false,
+          };
+        },
+        browser_paths: ({ workspace }) => ({
+          truncated: false,
+          paths: [{
+            kind: "file",
+            name: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
+            path: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
+            targetPath: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
+          }],
+        }),
+      },
+    });
+
+    await slot.findByText("env-1.txt");
+    const Component = registration.component;
+    slot.lifecycle.rerender(<Component projectId="project-2" params={null} />);
+    expect(await slot.findByText("env-2.txt")).toBeTruthy();
     expect(slot.container.querySelector(".project-files-shell")).not.toBeNull();
     slot.lifecycle.unmount();
   });

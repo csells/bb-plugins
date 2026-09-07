@@ -48,8 +48,10 @@ describe("project-files backend", () => {
     });
     await plugin(bb);
 
-    const result = await harness.behavior.callRpc("browser_bootstrap", null);
-    expect(result.projects[0]).toMatchObject({
+    const result = await harness.behavior.callRpc("browser_bootstrap", {
+      kind: "project", projectId: "project-1",
+    });
+    expect(result.project).toMatchObject({
       id: "project-1",
       name: "Apollo",
       workspaces: [
@@ -57,6 +59,82 @@ describe("project-files backend", () => {
         { kind: "source", rootPath: "/code/apollo", label: "Project source" },
       ],
     });
+    expect(result.selectedWorkspaceId).toBe("source:source-1");
+    expect(result.workspaceLocked).toBe(false);
+    await harness.lifecycle.dispose();
+  });
+
+  it("locks a thread browser to that thread's environment", async () => {
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "project-files",
+      sdk: {
+        projects: {
+          sidebarBootstrap: async () => ({
+            sections: [],
+            projects: [{
+              id: "project-1", name: "Apollo", kind: "standard",
+              createdAt: 1, updatedAt: 1, gitRemoteUrl: null, sources: [],
+              defaultExecutionOptions: null,
+              threads: [{
+                id: "thread-1", projectId: "project-1", environmentId: "env-1",
+                environmentHostId: "host-1", environmentName: "Feature orbit",
+                environmentBranchName: "feature/orbit",
+                environmentWorkspaceDisplayKind: "managed-worktree",
+              }],
+            }],
+          }),
+        },
+        hosts: { list: async () => [{ id: "host-1", name: "Studio" }] },
+        threads: {
+          get: async () => ({ projectId: "project-1", environmentId: "env-1" } as never),
+        },
+      },
+    });
+    await plugin(bb);
+
+    const result = await harness.behavior.callRpc("browser_bootstrap", {
+      kind: "thread", threadId: "thread-1",
+    });
+    expect(result.selectedWorkspaceId).toBe("environment:env-1");
+    expect(result.workspaceLocked).toBe(true);
+    await harness.lifecycle.dispose();
+  });
+
+  it("resolves a working directory owned by the personal project", async () => {
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "project-files",
+      sdk: {
+        projects: {
+          sidebarBootstrap: async () => ({
+            sections: [],
+            projects: [],
+            personalProject: {
+              id: "proj_personal", name: "Personal", kind: "personal",
+              createdAt: 1, updatedAt: 1, gitRemoteUrl: null, sources: [],
+              defaultExecutionOptions: null,
+              threads: [{
+                id: "thread-personal", projectId: "proj_personal",
+                environmentId: "env-personal", environmentHostId: "host-1",
+                environmentName: null, environmentBranchName: "main",
+                environmentWorkspaceDisplayKind: "other",
+              }],
+            },
+          }),
+        },
+        hosts: { list: async () => [{ id: "host-1", name: "Studio" }] },
+        threads: {
+          get: async () => ({ projectId: "proj_personal", environmentId: "env-personal" } as never),
+        },
+      },
+    });
+    await plugin(bb);
+
+    const result = await harness.behavior.callRpc("browser_bootstrap", {
+      kind: "thread", threadId: "thread-personal",
+    });
+    expect(result.project?.id).toBe("proj_personal");
+    expect(result.selectedWorkspaceId).toBe("environment:env-personal");
+    expect(result.workspaceLocked).toBe(true);
     await harness.lifecycle.dispose();
   });
 

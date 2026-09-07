@@ -3,13 +3,14 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   definePluginApp,
   experimental_FileLink as FileLink,
-  useBbContext,
+  useBbNavigate,
   useRealtimeConnectionState,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type {
   ExperimentalLiveFileTarget,
-  PluginNavPanelProps,
+  PluginNewThreadPanelProps,
+  PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import type {
   BrowserFileEntry,
@@ -223,14 +224,17 @@ function TreeRow({
   );
 }
 
-function ProjectFilesPage(_props: PluginNavPanelProps) {
+type BrowserScope =
+  | { kind: "project"; projectId: string | null }
+  | { kind: "thread"; threadId: string };
+
+function ProjectFilesBrowser({ scope }: { scope: BrowserScope }) {
   const rpc = useRpc<typeof rpcContract>();
-  const { projectId: routeProjectId } = useBbContext();
   const connection = useRealtimeConnectionState();
   const priorConnection = useRef(connection);
-  const [projects, setProjects] = useState<BrowserProject[] | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [project, setProject] = useState<BrowserProject | null | undefined>(undefined);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
+  const [workspaceLocked, setWorkspaceLocked] = useState(scope.kind === "thread");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showGenerated, setShowGenerated] = useState(false);
@@ -243,44 +247,29 @@ function ProjectFilesPage(_props: PluginNavPanelProps) {
     setError(cause instanceof Error ? cause.message : String(cause));
   }, []);
 
-  const loadProjects = useCallback(async () => {
+  const loadScope = useCallback(async () => {
     try {
-      const result = await rpc.call("browser_bootstrap");
-      setProjects(result.projects);
-      setSelectedProjectId((current) => {
-        if (result.projects.some((project) => project.id === current)) return current;
-        if (routeProjectId && result.projects.some((project) => project.id === routeProjectId)) {
-          return routeProjectId;
-        }
-        return result.projects[0]?.id ?? "";
-      });
+      const result = await rpc.call("browser_bootstrap", scope);
+      setEntries(null);
+      setProject(result.project);
+      setSelectedWorkspaceId(result.selectedWorkspaceId ?? "");
+      setWorkspaceLocked(result.workspaceLocked);
       setError(null);
     } catch (cause) {
       report(cause);
     }
-  }, [report, routeProjectId, rpc]);
+  }, [report, rpc, scope.kind, scope.kind === "project" ? scope.projectId : scope.threadId]);
 
-  useEffect(() => { void loadProjects(); }, [loadProjects]);
+  useEffect(() => { void loadScope(); }, [loadScope]);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query), 180);
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  const selectedProject = useMemo(
-    () => projects?.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId],
-  );
   const selectedWorkspace = useMemo(
-    () => selectedProject?.workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
-    [selectedProject, selectedWorkspaceId],
+    () => project?.workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
+    [project, selectedWorkspaceId],
   );
-
-  useEffect(() => {
-    if (selectedProject === null) return;
-    if (!selectedProject.workspaces.some((workspace) => workspace.id === selectedWorkspaceId)) {
-      setSelectedWorkspaceId(selectedProject.workspaces[0]?.id ?? "");
-    }
-  }, [selectedProject, selectedWorkspaceId]);
 
   useEffect(() => {
     if (selectedWorkspace === null) {
@@ -309,10 +298,10 @@ function ProjectFilesPage(_props: PluginNavPanelProps) {
     const was = priorConnection.current;
     priorConnection.current = connection;
     if (connection === "connected" && was === "reconnecting") {
-      void loadProjects();
+      void loadScope();
       setRefreshKey((value) => value + 1);
     }
-  }, [connection, loadProjects]);
+  }, [connection, loadScope]);
 
   const tree = useMemo(() => buildFileTree(entries ?? []), [entries]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -326,16 +315,15 @@ function ProjectFilesPage(_props: PluginNavPanelProps) {
   return (
     <div className="project-files-shell flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <div className="h-0.5 shrink-0 bg-primary" />
-      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-border bg-surface-scrim px-3 py-3 backdrop-blur md:grid-cols-[minmax(150px,0.8fr)_minmax(190px,1fr)_minmax(220px,1.35fr)_auto] md:px-4">
-        <SelectField className="col-span-2 md:col-span-1" label="Project" value={selectedProjectId} onChange={setSelectedProjectId}>
-          {(projects ?? []).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-        </SelectField>
-        <SelectField className="col-span-2 md:col-span-1" label="Workspace" value={selectedWorkspaceId} onChange={setSelectedWorkspaceId}>
-          {(selectedProject?.workspaces ?? []).map((workspace) => (
-            <option key={workspace.id} value={workspace.id}>{workspace.label}</option>
-          ))}
-        </SelectField>
-        <div className="relative min-w-0 md:col-auto">
+      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-border bg-surface-scrim px-3 py-3 backdrop-blur md:grid-cols-[minmax(190px,0.8fr)_minmax(220px,1.35fr)_auto] md:px-4">
+        {!workspaceLocked && (project?.workspaces.length ?? 0) > 1 ? (
+          <SelectField className="col-span-2 md:col-span-1" label="Workspace" value={selectedWorkspaceId} onChange={(value) => { setEntries(null); setSelectedWorkspaceId(value); }}>
+            {(project?.workspaces ?? []).map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>{workspace.label}</option>
+            ))}
+          </SelectField>
+        ) : null}
+        <div className={cn("relative min-w-0", (workspaceLocked || (project?.workspaces.length ?? 0) <= 1) && "md:col-span-2")}>
           <Icon name="Search" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find files and folders" aria-label="Find files and folders" className="pl-9 pr-9" />
           {query !== "" ? (
@@ -379,18 +367,24 @@ function ProjectFilesPage(_props: PluginNavPanelProps) {
           <div className="min-h-0 flex-1 overflow-y-auto p-2 md:p-3" role="tree" aria-label="Project files">
             {error !== null ? (
               <EmptyState icon="AlertCircle"><p className="font-medium text-foreground">Files could not be loaded</p><p className="mt-1">{error}</p></EmptyState>
-            ) : projects === null || entries === null ? (
+            ) : project === undefined ? (
               <div className="space-y-1 p-1" aria-label="Loading files">
                 {Array.from({ length: 9 }, (_, index) => <div key={index} className="project-files-skeleton h-9 rounded-md bg-muted" style={{ width: `${72 - (index % 4) * 7}%` }} />)}
               </div>
-            ) : projects.length === 0 ? (
-              <EmptyState icon="Folder">No browsable projects were found. Add a project source or open a thread in a project environment.</EmptyState>
+            ) : project === null ? (
+              <EmptyState icon="Folder">Choose a project in bb to browse its files.</EmptyState>
+            ) : selectedWorkspace === null ? (
+              <EmptyState icon="Folder">This project has no browsable source or thread environment.</EmptyState>
+            ) : entries === null ? (
+              <div className="space-y-1 p-1" aria-label="Loading files">
+                {Array.from({ length: 9 }, (_, index) => <div key={index} className="project-files-skeleton h-9 rounded-md bg-muted" style={{ width: `${72 - (index % 4) * 7}%` }} />)}
+              </div>
             ) : visible.length === 0 ? (
               <EmptyState icon={debouncedQuery ? "Search" : "Folder"}>{debouncedQuery ? "No paths match this search." : "This workspace contains no visible files."}</EmptyState>
             ) : (
               <div className="space-y-0.5">
                 {visible.map((node) => (
-                  <TreeRow key={node.path} node={node} workspace={selectedWorkspace!} expanded={expanded.has(node.path)} onToggle={() => {
+                  <TreeRow key={node.path} node={node} workspace={selectedWorkspace} expanded={expanded.has(node.path)} onToggle={() => {
                     setExpanded((current) => {
                       const next = new Set(current);
                       if (next.has(node.path)) next.delete(node.path); else next.add(node.path);
@@ -407,12 +401,48 @@ function ProjectFilesPage(_props: PluginNavPanelProps) {
   );
 }
 
+function ThreadProjectFiles({ threadId }: PluginThreadPanelProps) {
+  return <ProjectFilesBrowser scope={{ kind: "thread", threadId }} />;
+}
+
+function NewThreadProjectFiles({ projectId }: PluginNewThreadPanelProps) {
+  return <ProjectFilesBrowser scope={{ kind: "project", projectId }} />;
+}
+
+function ProjectFilesHeaderAction() {
+  const navigate = useBbNavigate();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Open Project Files"
+      className="size-7"
+      onClick={() => { navigate.openThreadPanel({ actionId: "project-files" }); }}
+    >
+      <Icon name="FolderOpen" className="size-4" />
+    </Button>
+  );
+}
+
 export default definePluginApp((app) => {
-  app.slots.navPanel({
+  app.slots.threadPanelAction({
     id: "project-files",
     title: "Project Files",
     icon: "FolderOpen",
-    path: "files",
-    component: ProjectFilesPage,
+    layout: "flush",
+    component: ThreadProjectFiles,
+  });
+  app.slots.experimental_newThreadPanelAction({
+    id: "project-files",
+    title: "Project Files",
+    icon: "FolderOpen",
+    layout: "flush",
+    component: NewThreadProjectFiles,
+  });
+  app.slots.experimental_threadHeaderAction({
+    id: "project-files",
+    title: "Project Files",
+    component: ProjectFilesHeaderAction,
   });
 });

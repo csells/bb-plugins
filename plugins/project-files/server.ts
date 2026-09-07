@@ -34,9 +34,19 @@ export type BrowserProject = z.infer<typeof projectSchema>;
 export type BrowserFileEntry = z.infer<typeof fileEntrySchema>;
 export type BrowserWorkspaceInput = z.infer<typeof workspaceInputSchema>;
 
+const browserScopeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("project"), projectId: z.string().nullable() }),
+  z.object({ kind: z.literal("thread"), threadId: z.string().min(1) }),
+]);
+
 export const rpcContract = defineRpcContract({
   browser_bootstrap: {
-    input: z.null(), output: z.object({ projects: z.array(projectSchema) }),
+    input: browserScopeSchema,
+    output: z.object({
+      project: projectSchema.nullable(),
+      selectedWorkspaceId: z.string().nullable(),
+      workspaceLocked: z.boolean(),
+    }),
   },
   browser_paths: {
     input: z.object({
@@ -82,42 +92,65 @@ function workspaceLabel(thread: {
       ? "Managed worktree" : "Working directory");
 }
 
+async function discoverProjects(bb: BbPluginApi): Promise<BrowserProject[]> {
+  const [snapshot, hosts] = await Promise.all([
+    bb.sdk.projects.sidebarBootstrap(), bb.sdk.hosts.list(),
+  ]);
+  const hostNames = new Map(hosts.map((host) => [host.id, host.name]));
+  const projects = snapshot.personalProject
+    ? [snapshot.personalProject, ...snapshot.projects]
+    : snapshot.projects;
+  return projects.map((project) => {
+    const environments = new Map<string, BrowserWorkspace>();
+    for (const thread of project.threads) {
+      if (thread.environmentId === null || thread.environmentHostId === null) continue;
+      if (environments.has(thread.environmentId)) continue;
+      const label = workspaceLabel(thread);
+      environments.set(thread.environmentId, {
+        kind: "environment", id: `environment:${thread.environmentId}`,
+        environmentId: thread.environmentId, hostId: thread.environmentHostId,
+        label,
+        detail: [thread.environmentBranchName, hostNames.get(thread.environmentHostId)]
+          .filter((value): value is string => Boolean(value)).join(" · "),
+      });
+    }
+    const sources: BrowserWorkspace[] = project.sources.map((source) => ({
+      kind: "source", id: `source:${source.id}`, hostId: source.hostId,
+      rootPath: source.path, label: "Project source",
+      detail: `${hostNames.get(source.hostId) ?? "Machine"} · ${source.path}`,
+    }));
+    return {
+      id: project.id, name: project.name, kind: project.kind,
+      workspaces: [...environments.values(), ...sources],
+    };
+  });
+}
+
 export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
-    browser_bootstrap: async () => {
-      const [snapshot, hosts] = await Promise.all([
-        bb.sdk.projects.sidebarBootstrap(), bb.sdk.hosts.list(),
-      ]);
-      const hostNames = new Map(hosts.map((host) => [host.id, host.name]));
-      const projects: BrowserProject[] = snapshot.projects.map((project) => {
-        const environments = new Map<string, BrowserWorkspace>();
-        for (const thread of project.threads) {
-          if (thread.environmentId === null || thread.environmentHostId === null) continue;
-          if (environments.has(thread.environmentId)) continue;
-          const label = workspaceLabel(thread);
-          environments.set(thread.environmentId, {
-            kind: "environment", id: `environment:${thread.environmentId}`,
-            environmentId: thread.environmentId, hostId: thread.environmentHostId,
-            label,
-            detail: [thread.environmentBranchName, hostNames.get(thread.environmentHostId)]
-              .filter((value): value is string => Boolean(value)).join(" · "),
-          });
-        }
-        const sources: BrowserWorkspace[] = project.sources.map((source) => ({
-          kind: "source", id: `source:${source.id}`, hostId: source.hostId,
-          rootPath: source.path, label: "Project source",
-          detail: `${hostNames.get(source.hostId) ?? "Machine"} · ${source.path}`,
-        }));
-        return {
-          id: project.id, name: project.name, kind: project.kind,
-          workspaces: [...environments.values(), ...sources],
-        };
-      });
+    browser_bootstrap: async (scope) => {
+      const projects = await discoverProjects(bb);
+      const thread = scope.kind === "thread"
+        ? await bb.sdk.threads.get({ threadId: scope.threadId })
+        : null;
+      const projectId = scope.kind === "thread" ? thread?.projectId : scope.projectId;
+      const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+      if (project === null) {
+        return { project: null, selectedWorkspaceId: null, workspaceLocked: scope.kind === "thread" };
+      }
+      const environmentWorkspace = thread?.environmentId
+        ? project.workspaces.find((workspace) =>
+          workspace.kind === "environment" && workspace.environmentId === thread.environmentId)
+        : null;
+      const projectWorkspace = project.workspaces.find((workspace) => workspace.kind === "source")
+        ?? project.workspaces[0]
+        ?? null;
       return {
-        projects: projects.filter((project) => project.workspaces.length > 0)
-          .sort((left, right) => left.name.localeCompare(right.name)),
+        project,
+        selectedWorkspaceId: (environmentWorkspace ?? projectWorkspace)?.id ?? null,
+        workspaceLocked: scope.kind === "thread",
       };
     },
 
