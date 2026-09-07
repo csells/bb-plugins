@@ -68,17 +68,6 @@ export default tseslint.config(
   },
 
   {
-    // A plugin factory is an await-capable extension point: the host awaits it
-    // and so do the tests, and read-aloud's genuinely awaits its settings.
-    // Declaring it async is part of that contract rather than an oversight, so
-    // do not demand an await inside the ones that happen not to need one yet.
-    files: ["**/server.ts"],
-    rules: {
-      "@typescript-eslint/require-await": "off",
-    },
-  },
-
-  {
     // Tests legitimately reach for casts and non-null assertions to build
     // fixtures; that is fixture-shaping, not a type hole in shipped code.
     files: ["**/*.test.ts", "**/*.test.tsx"],

@@ -12,7 +12,7 @@ describe("auto-pin", () => {
       pluginId: "auto-pin",
       sdk: { threads: { pin } },
     });
-    await plugin(bb);
+    plugin(bb);
 
     await harness.behavior.emitThreadEvent("thread.created", {
       thread: makeThreadResponse({
@@ -41,7 +41,7 @@ describe("auto-pin", () => {
       pluginId: "auto-pin",
       sdk: { threads: { pin } },
     });
-    await plugin(bb);
+    plugin(bb);
 
     await harness.behavior.emitThreadEvent("thread.created", {
       thread: makeThreadResponse({

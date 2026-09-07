@@ -41,6 +41,11 @@ describe("project-files backend", () => {
         projects: {
           sidebarBootstrap: async () => ({
             sections: [],
+            personalProject: {
+              id: "proj_personal", name: "Personal", kind: "personal",
+              createdAt: 1, updatedAt: 1, gitRemoteUrl: null, sources: [],
+              defaultExecutionOptions: null, threads: [],
+            },
             projects: [{
               id: "project-1", name: "Apollo", kind: "standard",
               createdAt: 1, updatedAt: 1, gitRemoteUrl: null,
@@ -62,7 +67,7 @@ describe("project-files backend", () => {
         hosts: { list: async () => [{ id: "host-1", name: "Studio" }] },
       },
     });
-    await plugin(bb);
+    plugin(bb);
 
     const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "project", projectId: "project-1",
@@ -87,6 +92,11 @@ describe("project-files backend", () => {
         projects: {
           sidebarBootstrap: async () => ({
             sections: [],
+            personalProject: {
+              id: "proj_personal", name: "Personal", kind: "personal",
+              createdAt: 1, updatedAt: 1, gitRemoteUrl: null, sources: [],
+              defaultExecutionOptions: null, threads: [],
+            },
             projects: [{
               id: "project-1", name: "Apollo", kind: "standard",
               createdAt: 1, updatedAt: 1, gitRemoteUrl: null, sources: [],
@@ -106,7 +116,7 @@ describe("project-files backend", () => {
         },
       },
     });
-    await plugin(bb);
+    plugin(bb);
 
     const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "thread", threadId: "thread-1",
@@ -143,7 +153,7 @@ describe("project-files backend", () => {
         },
       },
     });
-    await plugin(bb);
+    plugin(bb);
 
     const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "thread", threadId: "thread-personal",
@@ -170,7 +180,7 @@ describe("project-files backend", () => {
         },
       },
     });
-    await plugin(bb);
+    plugin(bb);
     const result = (await harness.behavior.callRpc("browser_paths", {
       workspace: { kind: "environment", environmentId: "env-1" },
       query: "",
