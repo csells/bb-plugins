@@ -7,25 +7,20 @@ Adds a speaker button to every message's action row, beside **Copy message**.
 Click it and a floating pill appears with elapsed time, ±10s seek, pause,
 playback speed, and stop.
 
-Audio is free and unmetered — it uses the same neural voices Microsoft Edge's
-Read Aloud feature uses, via [`edge-tts`](https://github.com/rany2/edge-tts).
+No API key, no metering, and **no external binary** — synthesis speaks
+Microsoft Edge's Read Aloud protocol directly over a WebSocket.
 
-## Requirements
-
-`edge-tts` must be on the machine running the BB server:
+## Install
 
 ```bash
-python3 -m venv ~/.local/share/edge-tts-venv
-~/.local/share/edge-tts-venv/bin/pip install edge-tts
+bb plugin install <this directory or git url>
 ```
 
-That path is the first one the plugin checks, followed by `/opt/homebrew/bin`,
-`/usr/local/bin`, and `PATH`. Override it in the plugin's settings if yours
-lives elsewhere. Verify with:
+That is the whole setup. Verify with:
 
 ```bash
 bb read-aloud status
-bb read-aloud voices en-GB     # filter the voice catalog
+bb read-aloud voices en-GB     # filter the live voice catalog
 ```
 
 ## Settings
@@ -34,36 +29,51 @@ bb read-aloud voices en-GB     # filter the voice catalog
 | --- | --- | --- |
 | Voice | `en-US-AndrewMultilingualNeural` | Any Microsoft neural voice |
 | Rate | `+8%` | **Synthesis** speed, baked into the audio |
-| edge-tts path | *(empty)* | Empty means search the paths above |
 
-Playback speed is separate and lives in `localStorage`, not here: it is a
-per-device UI preference you change mid-sentence, whereas plugin settings are
-server-side, global, and read once per load.
+Playback speed is separate and lives in `localStorage`: it is a per-device UI
+preference you change mid-sentence, whereas plugin settings are server-side,
+global, and read once per load.
 
 ## How it works
+
+**Native synthesis.** `synth.ts` implements the protocol in about forty lines:
+the `Sec-MS-GEC` token (SHA-256 of the current Windows FILETIME rounded to a
+five-minute boundary, which must be computed with `BigInt` — the tick count
+exceeds `Number.MAX_SAFE_INTEGER` and floating point silently hashes to a
+rejected token), the WebSocket handshake, and the binary framing. The only
+dependency is `ws`, needed because the browser WebSocket API cannot set the
+`Origin`/`User-Agent` headers the service checks.
+
+Earlier versions shelled out to the Python `edge-tts` CLI, which made the
+plugin uninstallable for anyone without that virtualenv. The npm ports were not
+usable either: `edge-tts-node` pins its client version to Chromium 130 and the
+service now refuses that handshake outright (close 1006), while `msedge-tts`
+ships a `preinstall: npx only-allow pnpm` hook that aborts any npm install.
+
+**One request, streamed.** The service streams a whole request incrementally —
+measured at ~1.5s to first byte and ~4.75x realtime for a six-minute message —
+so there is no text splitting and no stitching of parts. The 11-second startup
+the chunked version worked around was the Python CLI, not the service.
 
 **Two routes, not one.** `POST /prepare` takes the message text and returns a
 job id; `GET /stream?id=` returns `audio/mpeg`. A single GET would be simpler,
 but message text runs to tens of thousands of characters and would not survive
-a URL — and an `<audio>` element can only issue a GET anyway.
+a URL.
 
-**Stop genuinely cancels.** Clearing the element's `src` aborts the HTTP
-response, which runs the stream's `cancel()`, which SIGKILLs every live synth
-process. Stopping a twelve-minute read costs nothing instead of letting
-synthesis finish unheard.
+**Stop genuinely cancels.** Stopping aborts the request, which runs the
+stream's `cancel()` and closes the synthesis socket. Stopping a twelve-minute
+read costs nothing instead of letting it finish unheard.
 
-**Chunked, pipelined synthesis.** `edge-tts` returns a chunk's audio only once
-that chunk is fully synthesized. Handing it a whole message means the first
-byte lands ~11s after the click. Instead the text is split on sentence
-boundaries with a deliberately tiny first chunk (~160 chars) and larger ones
-after (~700), synthesizing three ahead. Measured first audio: **~2–4s**.
-Synthesis runs ~1.6x realtime, so once started the buffer stays ahead of
-playback.
-
-Each chunk's ID3/Xing header is stripped before it enters the stream. MP3 has
-no global header — only per-frame headers — so parts concatenate fine, but a
-per-chunk Xing header mid-stream describes only its own chunk and makes
-decoders miscompute duration and seeking.
+**Playback goes through MediaSource,** which exists entirely for seeking.
+Pointed straight at a chunked response the browser treats it as live: it
+throttles reads to ~2s ahead of the playhead and reports `seekable` as
+`[0, Infinity]`, so a 10-second jump either moves about two seconds or sails
+past the received audio and resets to zero. Appending every byte as it arrives
+makes `buffered` mean what it says — measured 36s of lead versus 2.3s — so a
+jump lands exactly and the true edge is knowable. Seeks clamp to that edge;
+landing on it starves playback, which surfaces as the "Preparing" state until
+more audio arrives. Engines without MSE for mp3 fall back to direct streaming,
+where playback works but jumps are smaller.
 
 **Markdown is flattened first.** Raw markdown through a TTS engine says "hash
 hash Loose ends" and spells out URLs character by character. Code fences become
@@ -92,20 +102,15 @@ drops its text label first on narrow screens so the controls always fit.
 
 ## Known limitations
 
-- **Seeking is clamped against `seekable`, not `buffered`.** The response is
-  chunked with no `Content-Length`, so `duration` is `Infinity` — but measured
-  in Chrome, `seekable.end` is `Infinity` too, and a forward seek past the
-  buffered edge lands exactly and keeps playing. Clamping to `buffered` would
-  be wrong: on a stream the browser treats as live it holds only ~2s ahead of
-  the playhead, which pins a 10-second jump to about two.
-- **Not self-contained.** It shells out to a Python `edge-tts`. Making this
-  installable by anyone means porting the protocol to Node — the WebSocket and
-  its time-based trusted-client token.
-- **`edge-tts` uses an undocumented endpoint.** No SLA, and it has broken
-  before when Microsoft changed the token scheme. Fine personally; think twice
-  before depending on it in something you ship.
+- **The protocol endpoint is undocumented.** There is no SLA, and it has broken
+  before when Microsoft changed the token scheme. `CHROMIUM_VERSION` in
+  `synth.ts` is the single value that rots: if synthesis starts failing with
+  close code 1006, bump it to a current Edge version. `bb read-aloud status`
+  says so in its error output.
 - Voice catalog only — no cloning, and no control over the 24kHz/48kbps output
   format.
+- Without MSE for mp3, ±10s jumps are limited by how little the browser
+  buffers ahead.
 
 ## Selection reading
 

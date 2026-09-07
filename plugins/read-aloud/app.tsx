@@ -163,18 +163,109 @@ function ensureAudio(): HTMLAudioElement {
   return element;
 }
 
+/** Aborts the in-flight synthesis request. */
+let inFlight: AbortController | null = null;
+/** Object URL backing the MediaSource, revoked on stop. */
+let objectUrl: string | null = null;
+
+const MSE_MIME = "audio/mpeg";
+function canUseMediaSource(): boolean {
+  return (
+    typeof MediaSource !== "undefined" && MediaSource.isTypeSupported(MSE_MIME)
+  );
+}
+
 /**
- * Stops playback and aborts the in-flight response. Clearing src + load() is
- * what tears down the HTTP connection, which runs the server stream's cancel()
- * and kills the synth processes — so stopping a long read costs nothing.
+ * Feeds the response into a MediaSource instead of assigning it as src.
+ *
+ * This exists for seeking. Pointed straight at a chunked response the browser
+ * treats it as live: it throttles reads to ~2s ahead of the playhead and
+ * reports `seekable` as [0, Infinity], so a 10-second jump either moves about
+ * two seconds or sails past the received audio and resets to zero. Appending
+ * every byte we receive makes `buffered` mean what it says — and since
+ * synthesis runs several times faster than playback, it runs far ahead — so a
+ * jump lands exactly and the true edge is knowable.
+ */
+async function feedViaMediaSource(
+  element: HTMLAudioElement,
+  url: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const mediaSource = new MediaSource();
+  objectUrl = URL.createObjectURL(mediaSource);
+  element.src = objectUrl;
+
+  await new Promise<void>((resolve, reject) => {
+    mediaSource.addEventListener("sourceopen", () => resolve(), { once: true });
+    mediaSource.addEventListener("error", () => reject(new Error("MediaSource failed")), {
+      once: true,
+    });
+  });
+  if (signal.aborted) return;
+
+  const buffer = mediaSource.addSourceBuffer(MSE_MIME);
+  // A SourceBuffer accepts one append at a time; queue behind updateend.
+  const appended = (chunk: Uint8Array) =>
+    new Promise<void>((resolve, reject) => {
+      const onDone = () => {
+        buffer.removeEventListener("updateend", onDone);
+        buffer.removeEventListener("error", onFail);
+        resolve();
+      };
+      const onFail = () => {
+        buffer.removeEventListener("updateend", onDone);
+        buffer.removeEventListener("error", onFail);
+        reject(new Error("append failed"));
+      };
+      buffer.addEventListener("updateend", onDone, { once: true });
+      buffer.addEventListener("error", onFail, { once: true });
+      buffer.appendBuffer(chunk as unknown as BufferSource);
+    });
+
+  const response = await fetch(url, { signal });
+  if (!response.ok || response.body === null) {
+    throw new Error(`stream failed (${response.status})`);
+  }
+  const reader = response.body.getReader();
+
+  // Drive the read loop without blocking the caller, so play() can start on
+  // the first appended bytes rather than after the whole synthesis.
+  void (async () => {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done || signal.aborted) break;
+        if (value !== undefined && value.length > 0) await appended(value);
+      }
+      if (!signal.aborted && mediaSource.readyState === "open") {
+        // Sets a finite duration, which makes the whole timeline seekable.
+        mediaSource.endOfStream();
+      }
+    } catch {
+      // Abort or a mid-stream failure: stop() and the element's error handler
+      // own the user-visible outcome from here.
+    }
+  })();
+}
+
+/**
+ * Stops playback and tears down the request, which runs the server stream's
+ * cancel() and closes the synthesis socket — so stopping a long read costs
+ * nothing rather than letting it finish unheard.
  */
 function stop(): void {
   generation += 1;
+  inFlight?.abort();
+  inFlight = null;
   const element = audio;
   if (element !== null) {
     element.pause();
     element.removeAttribute("src");
     element.load();
+  }
+  if (objectUrl !== null) {
+    URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
   }
   state = { ...IDLE, rate: state.rate };
   emit();
@@ -191,25 +282,29 @@ function resume(): void {
 }
 
 /**
- * Seeks relative to the playhead.
+ * Seeks relative to the playhead, clamped to audio actually received.
  *
- * Clamp against `seekable`, never `buffered`. The response is chunked with no
- * Content-Length, so `duration` is Infinity — but measured in Chrome, so is
- * `seekable.end`, and a forward seek past the buffered edge lands exactly and
- * keeps playing. `buffered` is the wrong ceiling: on a stream the browser
- * treats as live it holds only ~2s ahead of the playhead, which would pin a
- * 10-second jump to about two.
+ * `seekable` is the wrong ceiling: on an unbounded stream it reports
+ * [0, Infinity], so a jump past the received audio does not wait for data — the
+ * element resets to zero, which reads as the player wrapping to the start.
+ * `buffered` is the honest edge, and because MediaSource is fed every byte as
+ * it arrives while synthesis outruns playback several times over, it sits well
+ * ahead of the playhead.
+ *
+ * Landing exactly on that edge starves playback, which surfaces as the
+ * "Preparing" state until more audio lands — the right answer for "I fast
+ * forwarded past what exists yet".
  */
 function seekBy(delta: number): void {
   const element = audio;
   if (element === null) return;
-  const ceiling =
-    element.seekable.length > 0
-      ? element.seekable.end(element.seekable.length - 1)
-      : Number.POSITIVE_INFINITY;
+  const bufferedEnd =
+    element.buffered.length > 0
+      ? element.buffered.end(element.buffered.length - 1)
+      : element.currentTime;
   const target = Math.max(
     0,
-    Math.min(element.currentTime + delta, ceiling),
+    Math.min(element.currentTime + delta, bufferedEnd),
   );
   try {
     element.currentTime = target;
@@ -260,7 +355,19 @@ async function speak(input: {
     if (mine !== generation) return; // Stopped while preparing.
 
     const element = ensureAudio();
-    element.src = `${PLUGIN_ROUTE}/stream?id=${encodeURIComponent(id)}`;
+    const url = `${PLUGIN_ROUTE}/stream?id=${encodeURIComponent(id)}`;
+    const controller = new AbortController();
+    inFlight = controller;
+
+    if (canUseMediaSource()) {
+      await feedViaMediaSource(element, url, controller.signal);
+    } else {
+      // Fallback for engines without MSE for mp3: playback works, but the
+      // browser buffers barely ahead, so a 10-second jump moves less.
+      element.src = url;
+    }
+    if (mine !== generation) return; // Stopped while connecting.
+
     // Apply the stored preference before play(), including on a fresh element.
     element.playbackRate = state.rate;
     await element.play();
