@@ -1,6 +1,10 @@
 {
   "name": "bb-plugin-read-aloud",
   "version": "0.1.0",
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit"
+  },
   "type": "module",
   "engines": {
     "bb": ">=0.42",

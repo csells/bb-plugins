@@ -225,7 +225,7 @@ export async function* synthesize(
   // Bridge push-based socket events into pull-based iteration.
   const queue: Uint8Array[] = [];
   let done = false;
-  let failure: Error | null = null;
+  const failure: { current: Error | null } = { current: null };
   let wake: (() => void) | null = null;
   const notify = () => {
     wake?.();
@@ -233,7 +233,7 @@ export async function* synthesize(
   };
 
   const abort = () => {
-    failure = new Error("aborted");
+    failure.current = new Error("aborted");
     done = true;
     try {
       socket.close();
@@ -270,7 +270,7 @@ export async function* synthesize(
   });
 
   socket.on("error", (cause: Error) => {
-    failure = cause;
+    failure.current = cause;
     done = true;
     notify();
   });
@@ -328,7 +328,9 @@ export async function* synthesize(
       const chunk = queue.shift();
       if (chunk !== undefined) yield chunk;
     }
-    if (failure !== null && failure.message !== "aborted") throw failure;
+    if (failure.current !== null && failure.current.message !== "aborted") {
+      throw failure.current;
+    }
   } finally {
     signal?.removeEventListener("abort", abort);
     try {

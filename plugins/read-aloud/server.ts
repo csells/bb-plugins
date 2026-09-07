@@ -153,7 +153,7 @@ export default async function plugin(bb: BbPluginApi) {
     override: initial.clientVersion,
     learned: await bb.storage.kv.get<string>(LEARNED_VERSION_KEY),
     onLearned: (version) => {
-      bb.log.info("negotiated a newer client version", { version });
+      bb.log.info(`negotiated a newer client version: ${version}`);
       void bb.storage.kv.set(LEARNED_VERSION_KEY, version);
     },
   });
@@ -250,9 +250,9 @@ export default async function plugin(bb: BbPluginApi) {
             }
             if (!controller.signal.aborted) sink.close();
           } catch (cause) {
-            bb.log.error("synthesis failed", {
-              error: cause instanceof Error ? cause.message : String(cause),
-            });
+            bb.log.error(
+              `synthesis failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+            );
             try {
               sink.error(cause);
             } catch {
