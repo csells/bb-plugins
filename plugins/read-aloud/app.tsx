@@ -196,8 +196,8 @@ async function feedViaMediaSource(
   element.src = objectUrl;
 
   await new Promise<void>((resolve, reject) => {
-    mediaSource.addEventListener("sourceopen", () => resolve(), { once: true });
-    mediaSource.addEventListener("error", () => reject(new Error("MediaSource failed")), {
+    mediaSource.addEventListener("sourceopen", () => { resolve(); }, { once: true });
+    mediaSource.addEventListener("error", () => { reject(new Error("MediaSource failed")); }, {
       once: true,
     });
   });
@@ -232,10 +232,10 @@ async function feedViaMediaSource(
   // the first appended bytes rather than after the whole synthesis.
   void (async () => {
     try {
-      while (true) {
+      for (;;) {
         const { done, value } = await reader.read();
         if (done || signal.aborted) break;
-        if (value !== undefined && value.length > 0) await appended(value);
+        if (value.length > 0) await appended(value);
       }
       if (!signal.aborted && mediaSource.readyState === "open") {
         // Sets a finite duration, which makes the whole timeline seekable.
@@ -561,7 +561,7 @@ function ReadAloudPlayer() {
           )}
 
           <TransportButton
-            onClick={() => seekBy(-SEEK_SECONDS)}
+            onClick={() => { seekBy(-SEEK_SECONDS); }}
             label="Back 10 seconds"
             disabled={isPreparing}
           >
@@ -593,7 +593,7 @@ function ReadAloudPlayer() {
           )}
 
           <TransportButton
-            onClick={() => seekBy(SEEK_SECONDS)}
+            onClick={() => { seekBy(SEEK_SECONDS); }}
             label="Forward 10 seconds"
             disabled={isPreparing}
           >

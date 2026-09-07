@@ -77,7 +77,8 @@ describe("file tree", () => {
     const slot = renderSlot(registration, { projectId: "project-1", params: null }, {
       context: { projectId: "project-1", threadId: null },
       rpc: {
-        browser_bootstrap: ({ projectId }) => {
+        browser_bootstrap: (input) => {
+          const { projectId } = input as { projectId: string | null };
           const current = projectId === "project-2"
             ? project("project-2", "Gemini", "env-2")
             : project("project-1", "Apollo", "env-1");
@@ -87,15 +88,21 @@ describe("file tree", () => {
             workspaceLocked: false,
           };
         },
-        browser_paths: ({ workspace }) => ({
-          truncated: false,
-          paths: [{
-            kind: "file",
-            name: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
-            path: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
-            targetPath: workspace.kind === "environment" ? `${workspace.environmentId}.txt` : "source.txt",
-          }],
-        }),
+        browser_paths: (input) => {
+          const { workspace } = input as {
+            workspace:
+              | { kind: "environment"; environmentId: string }
+              | { kind: "source"; rootPath: string };
+          };
+          const name =
+            workspace.kind === "environment"
+              ? `${workspace.environmentId}.txt`
+              : "source.txt";
+          return {
+            truncated: false,
+            paths: [{ kind: "file", name, path: name, targetPath: name }],
+          };
+        },
       },
     });
 

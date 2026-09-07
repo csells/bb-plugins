@@ -162,7 +162,7 @@ function SelectField({
       <select
         aria-label={label}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => { onChange(event.target.value); }}
         className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring coarse:h-11 coarse:text-base"
       >
         {children}
@@ -262,8 +262,8 @@ function ProjectFilesBrowser({ scope }: { scope: BrowserScope }) {
 
   useEffect(() => { void loadScope(); }, [loadScope]);
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query), 180);
-    return () => window.clearTimeout(timer);
+    const timer = window.setTimeout(() => { setDebouncedQuery(query); }, 180);
+    return () => { window.clearTimeout(timer); };
   }, [query]);
 
   const selectedWorkspace = useMemo(
@@ -288,7 +288,7 @@ function ProjectFilesBrowser({ scope }: { scope: BrowserScope }) {
       setEntries(result.paths);
       setTruncated(result.truncated);
       setError(null);
-    }, (cause) => {
+    }, (cause: unknown) => {
       if (!cancelled) report(cause);
     });
     return () => { cancelled = true; };
@@ -325,14 +325,14 @@ function ProjectFilesBrowser({ scope }: { scope: BrowserScope }) {
         ) : null}
         <div className={cn("relative min-w-0", (workspaceLocked || (project?.workspaces.length ?? 0) <= 1) && "md:col-span-2")}>
           <Icon name="Search" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find files and folders" aria-label="Find files and folders" className="pl-9 pr-9" />
+          <Input value={query} onChange={(event) => { setQuery(event.target.value); }} placeholder="Find files and folders" aria-label="Find files and folders" className="pl-9 pr-9" />
           {query !== "" ? (
-            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground">
+            <button type="button" onClick={() => { setQuery(""); }} aria-label="Clear search" className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground">
               <Icon name="X" className="size-3.5" />
             </button>
           ) : null}
         </div>
-        <Button variant="outline" size="icon" aria-label="Refresh files" onClick={() => setRefreshKey((value) => value + 1)} className="coarse:h-11 coarse:w-11">
+        <Button variant="outline" size="icon" aria-label="Refresh files" onClick={() => { setRefreshKey((value) => value + 1); }} className="coarse:h-11 coarse:w-11">
           <Icon name="RotateCcw" className="size-4" />
         </Button>
       </div>
@@ -354,7 +354,7 @@ function ProjectFilesBrowser({ scope }: { scope: BrowserScope }) {
             {truncated ? <span className="text-warning-text lg:col-span-2">First 4,000 paths shown</span> : null}
           </div>
           <label className="mt-3 flex min-h-9 cursor-pointer items-center gap-2 rounded-md text-xs text-muted-foreground lg:border-t lg:border-border lg:pt-3 coarse:min-h-11 coarse:text-sm">
-            <input type="checkbox" checked={showGenerated} onChange={(event) => setShowGenerated(event.target.checked)} className="size-4 accent-primary" />
+            <input type="checkbox" checked={showGenerated} onChange={(event) => { setShowGenerated(event.target.checked); }} className="size-4 accent-primary" />
             Show generated folders
           </label>
         </aside>

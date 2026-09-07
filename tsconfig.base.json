@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": [
+    "Shared strictest-practical TypeScript settings for every plugin.",
+    "Each plugin extends this and adds only what is specific to it:",
+    "jsx, paths, and its own include list.",
+    "",
+    "`strict` is the baseline, not the ceiling. Everything below it is a check",
+    "TypeScript leaves off by default, and each one has caught something real:",
+    "noUncheckedIndexedAccess in particular is what turns arr[i] into a",
+    "possibly-undefined value instead of a lie."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "noEmit": true,
+
+    /* Check dependency declarations too, rather than trusting them. */
+    "skipLibCheck": false,
+    "forceConsistentCasingInFileNames": true,
+
+    /* The umbrella: noImplicitAny, strictNullChecks, strictFunctionTypes,
+       strictBindCallApply, strictPropertyInitialization, noImplicitThis,
+       useUnknownInCatchVariables, alwaysStrict. */
+    "strict": true,
+
+    /* Beyond `strict` — off by default, all worth having. */
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    /* Keep the source honest about what erases at build time. bb bundles with
+       esbuild, which strips types without checking them, so type-only imports
+       must say so and enum/namespace syntax must not appear. */
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true
+  }
+}

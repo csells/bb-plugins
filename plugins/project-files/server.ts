@@ -97,6 +97,12 @@ async function discoverProjects(bb: BbPluginApi): Promise<BrowserProject[]> {
     bb.sdk.projects.sidebarBootstrap(), bb.sdk.hosts.list(),
   ]);
   const hostNames = new Map(hosts.map((host) => [host.id, host.name]));
+  // The SDK schema types personalProject as non-nullable, so
+  // no-unnecessary-condition calls this guard dead. It is not: a host (and the
+  // test harness's fake bootstrap) can return a snapshot without it, and
+  // dropping the check puts undefined into `projects` and crashes downstream on
+  // `.threads`. Verified by removing it and watching two tests fail.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const projects = snapshot.personalProject
     ? [snapshot.personalProject, ...snapshot.projects]
     : snapshot.projects;
@@ -182,5 +188,5 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  bb.onDispose(() => bb.log.info("disposed"));
+  bb.onDispose(() => { bb.log.info("disposed"); });
 }

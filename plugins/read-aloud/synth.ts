@@ -192,7 +192,7 @@ async function connect(): Promise<WebSocket> {
   }
   throw new Error(
     `handshake refused for client versions ${candidates.join(", ")}` +
-      `${last === null ? "" : ` (${last.message})`}`,
+      (last === null ? "" : ` (${last.message})`),
   );
 }
 
@@ -224,7 +224,7 @@ export async function* synthesize(
 
   // Bridge push-based socket events into pull-based iteration.
   const queue: Uint8Array[] = [];
-  let done = false;
+  const done = { current: false };
   const failure: { current: Error | null } = { current: null };
   let wake: (() => void) | null = null;
   const notify = () => {
@@ -234,7 +234,7 @@ export async function* synthesize(
 
   const abort = () => {
     failure.current = new Error("aborted");
-    done = true;
+    done.current = true;
     try {
       socket.close();
     } catch {
@@ -259,7 +259,7 @@ export async function* synthesize(
     }
     // Text frames carry turn.start / response / turn.end.
     if (data.toString("utf8").includes("Path:turn.end")) {
-      done = true;
+      done.current = true;
       try {
         socket.close();
       } catch {
@@ -271,11 +271,11 @@ export async function* synthesize(
 
   socket.on("error", (cause: Error) => {
     failure.current = cause;
-    done = true;
+    done.current = true;
     notify();
   });
   socket.on("close", () => {
-    done = true;
+    done.current = true;
     notify();
   });
 
@@ -313,12 +313,12 @@ export async function* synthesize(
   );
 
   try {
-    while (true) {
+    for (;;) {
       while (queue.length > 0) {
         const chunk = queue.shift();
         if (chunk !== undefined) yield chunk;
       }
-      if (done) break;
+      if (done.current) break;
       await new Promise<void>((resolve) => {
         wake = resolve;
       });
@@ -348,6 +348,32 @@ export interface VoiceSummary {
   personalities: string;
 }
 
+/**
+ * Coerces one untrusted JSON value to a string, without the
+ * "[object Object]" that String() produces for a non-primitive.
+ */
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+}
+
+/**
+ * The wire shape of one entry in the voice catalog. Declared rather than read
+ * off a Record<string, unknown>, both to document what the service returns and
+ * because property access on an index signature is not allowed under
+ * noPropertyAccessFromIndexSignature. Fields stay `unknown`: this is untrusted
+ * JSON, so every one is coerced at the point of use.
+ */
+interface RawVoice {
+  ShortName?: unknown;
+  Gender?: unknown;
+  Locale?: unknown;
+  VoiceTag?: { VoicePersonalities?: unknown } | undefined;
+}
+
 /** The voice catalog, for `bb read-aloud voices`. Escalates like connect(). */
 export async function listVoices(): Promise<VoiceSummary[]> {
   const candidates = candidateVersions();
@@ -367,19 +393,14 @@ export async function listVoices(): Promise<VoiceSummary[]> {
     }
     const raw = (await response.json()) as unknown;
     if (!Array.isArray(raw)) throw new Error("unexpected voice list shape");
-    return raw.map((entry) => {
-      const item = entry as Record<string, unknown>;
-      const tags = item.VoiceTag as Record<string, unknown> | undefined;
-      const personalities = Array.isArray(tags?.VoicePersonalities)
-        ? (tags?.VoicePersonalities as string[]).join(", ")
-        : "";
-      return {
-        shortName: String(item.ShortName ?? ""),
-        gender: String(item.Gender ?? ""),
-        locale: String(item.Locale ?? ""),
-        personalities,
-      };
-    });
+    return (raw as RawVoice[]).map((item) => ({
+      shortName: asText(item.ShortName),
+      gender: asText(item.Gender),
+      locale: asText(item.Locale),
+      personalities: Array.isArray(item.VoiceTag?.VoicePersonalities)
+        ? item.VoiceTag.VoicePersonalities.map(asText).join(", ")
+        : "",
+    }));
   }
   throw new Error(`voice list failed (${lastStatus})`);
 }

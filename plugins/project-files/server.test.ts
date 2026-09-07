@@ -2,6 +2,22 @@ import { describe, expect, it } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, { isGeneratedPath, normalizePath, relativePath } from "./server";
 
+/**
+ * The testing harness types callRpc as Promise<unknown>, so these name the
+ * shapes each method returns. Only the fields the assertions touch are
+ * declared; the rest stays unknown rather than being restated here.
+ */
+interface BootstrapResult {
+  project: { id: string; name: string; workspaces: unknown[] } | null;
+  selectedWorkspaceId: string;
+  workspaceLocked: boolean;
+}
+interface PathsResult {
+  truncated: boolean;
+  paths: { kind: string; name: string; path: string; targetPath: string }[];
+}
+
+
 describe("path helpers", () => {
   it("normalizes separators and project-relative prefixes", () => {
     expect(normalizePath("./src\\feature/")).toBe("src/feature");
@@ -48,9 +64,9 @@ describe("project-files backend", () => {
     });
     await plugin(bb);
 
-    const result = await harness.behavior.callRpc("browser_bootstrap", {
+    const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "project", projectId: "project-1",
-    });
+    })) as BootstrapResult;
     expect(result.project).toMatchObject({
       id: "project-1",
       name: "Apollo",
@@ -86,15 +102,15 @@ describe("project-files backend", () => {
         },
         hosts: { list: async () => [{ id: "host-1", name: "Studio" }] },
         threads: {
-          get: async () => ({ projectId: "project-1", environmentId: "env-1" } as never),
+          get: async () => ({ projectId: "project-1", environmentId: "env-1" }),
         },
       },
     });
     await plugin(bb);
 
-    const result = await harness.behavior.callRpc("browser_bootstrap", {
+    const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "thread", threadId: "thread-1",
-    });
+    })) as BootstrapResult;
     expect(result.selectedWorkspaceId).toBe("environment:env-1");
     expect(result.workspaceLocked).toBe(true);
     await harness.lifecycle.dispose();
@@ -123,15 +139,15 @@ describe("project-files backend", () => {
         },
         hosts: { list: async () => [{ id: "host-1", name: "Studio" }] },
         threads: {
-          get: async () => ({ projectId: "proj_personal", environmentId: "env-personal" } as never),
+          get: async () => ({ projectId: "proj_personal", environmentId: "env-personal" }),
         },
       },
     });
     await plugin(bb);
 
-    const result = await harness.behavior.callRpc("browser_bootstrap", {
+    const result = (await harness.behavior.callRpc("browser_bootstrap", {
       kind: "thread", threadId: "thread-personal",
-    });
+    })) as BootstrapResult;
     expect(result.project?.id).toBe("proj_personal");
     expect(result.selectedWorkspaceId).toBe("environment:env-personal");
     expect(result.workspaceLocked).toBe(true);
@@ -155,12 +171,12 @@ describe("project-files backend", () => {
       },
     });
     await plugin(bb);
-    const result = await harness.behavior.callRpc("browser_paths", {
+    const result = (await harness.behavior.callRpc("browser_paths", {
       workspace: { kind: "environment", environmentId: "env-1" },
       query: "",
       showGenerated: false,
       limit: 4000,
-    });
+    })) as PathsResult;
     expect(result.paths.map((entry) => entry.path)).toEqual(["src", "src/main.ts"]);
     await harness.lifecycle.dispose();
   });
