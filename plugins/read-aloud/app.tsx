@@ -55,7 +55,19 @@ function saveRate(rate: number): void {
   }
 }
 
-type Status = "idle" | "loading" | "playing" | "paused" | "error";
+/**
+ * "loading" is the initial prepare-and-connect wait; "buffering" is running out
+ * of audio mid-stream because the next synth chunk has not landed yet. They
+ * look the same to the user but differ in what the transport can do: there is
+ * nothing to seek or pause before playback has ever started.
+ */
+type Status =
+  | "idle"
+  | "loading"
+  | "buffering"
+  | "playing"
+  | "paused"
+  | "error";
 
 interface PlayerState {
   status: Status;
@@ -128,6 +140,15 @@ function ensureAudio(): HTMLAudioElement {
   element.addEventListener("ended", () => {
     stop();
   });
+  // Starved mid-stream. Distinct from a user pause (paused stays false) and
+  // from the initial load, so only promote an already-running playback —
+  // "waiting" also fires before the first frame and right after a seek.
+  const onStarved = () => {
+    if (element.getAttribute("src") === null) return;
+    if (getState().status === "playing") setState({ status: "buffering" });
+  };
+  element.addEventListener("waiting", onStarved);
+  element.addEventListener("stalled", onStarved);
   element.addEventListener("timeupdate", syncProgress);
   element.addEventListener("progress", syncProgress);
   element.addEventListener("error", () => {
@@ -258,6 +279,22 @@ function formatClock(seconds: number): string {
   return `${minutes}:${String(whole % 60).padStart(2, "0")}`;
 }
 
+/**
+ * The same mark as assets/speaker.svg, which is this plugin's manifest icon and
+ * therefore the glyph BB draws on the message action button. Kept inline and in
+ * sync deliberately: the pill's status icon has to read as "this is the read
+ * aloud thing", not as a second play button competing with the real one.
+ */
+function SpeakerGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path d="M13 4.5a1 1 0 0 0-1.7-.7L7.2 8H4a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 4 16h3.2l4.1 4.2a1 1 0 0 0 1.7-.7v-15z" />
+      <path d="M16.2 8.3a1 1 0 0 1 1.4 0 5.5 5.5 0 0 1 0 7.4 1 1 0 0 1-1.4-1.4 3.5 3.5 0 0 0 0-4.6 1 1 0 0 1 0-1.4z" />
+      <path d="M19.1 5.4a1 1 0 0 1 1.4 0 9.5 9.5 0 0 1 0 13.2 1 1 0 0 1-1.4-1.4 7.5 7.5 0 0 0 0-10.4 1 1 0 0 1 0-1.4z" />
+    </svg>
+  );
+}
+
 /** Circular arrow with the jump size inside it, mirrored for forward. */
 function SeekGlyph({ forward }: { forward: boolean }) {
   return (
@@ -359,7 +396,10 @@ function ReadAloudPlayer() {
   if (player.status === "idle") return null;
 
   const isError = player.status === "error";
-  const isBusy = player.status === "loading";
+  // Nothing to seek or pause until playback has started at least once.
+  const isPreparing = player.status === "loading";
+  // Both waits show the spinner and the "Preparing" copy.
+  const isBusy = isPreparing || player.status === "buffering";
 
   return (
     <div
@@ -375,15 +415,20 @@ function ReadAloudPlayer() {
       role="status"
       aria-live="polite"
     >
-      <Icon
-        name={isBusy ? "Loading" : "Play"}
-        className={cn(
-          "mr-1 size-3.5 shrink-0",
-          isBusy && "animate-spin",
-          isError ? "text-destructive" : "text-muted-foreground",
-        )}
-        aria-hidden
-      />
+      {isBusy ? (
+        <Icon
+          name="Loading"
+          className="text-muted-foreground mr-1 size-3.5 shrink-0 animate-spin"
+          aria-hidden
+        />
+      ) : (
+        <SpeakerGlyph
+          className={cn(
+            "mr-1 size-3.5 shrink-0",
+            isError ? "text-destructive" : "text-muted-foreground",
+          )}
+        />
+      )}
 
       {/* The label is the first thing to go on a narrow screen. */}
       <span
@@ -401,7 +446,8 @@ function ReadAloudPlayer() {
 
       {!isError && (
         <>
-          {!isBusy && (
+          {/* Keep the clock while buffering: the position is still meaningful. */}
+          {!isPreparing && (
             <span className="text-muted-foreground mr-0.5 shrink-0 text-xs tabular-nums">
               {formatClock(player.position)}
             </span>
@@ -410,7 +456,7 @@ function ReadAloudPlayer() {
           <TransportButton
             onClick={() => seekBy(-SEEK_SECONDS)}
             label="Back 10 seconds"
-            disabled={isBusy}
+            disabled={isPreparing}
           >
             <span className="size-4 max-md:pointer-coarse:size-5">
               <SeekGlyph forward={false} />
@@ -426,7 +472,11 @@ function ReadAloudPlayer() {
               />
             </TransportButton>
           ) : (
-            <TransportButton onClick={pause} label="Pause" disabled={isBusy}>
+            <TransportButton
+              onClick={pause}
+              label="Pause"
+              disabled={isPreparing}
+            >
               <Icon
                 name="Pause"
                 className="size-4 max-md:pointer-coarse:size-5"
@@ -438,7 +488,7 @@ function ReadAloudPlayer() {
           <TransportButton
             onClick={() => seekBy(SEEK_SECONDS)}
             label="Forward 10 seconds"
-            disabled={isBusy}
+            disabled={isPreparing}
           >
             <span className="size-4 max-md:pointer-coarse:size-5">
               <SeekGlyph forward />
