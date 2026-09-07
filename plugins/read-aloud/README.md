@@ -7,6 +7,8 @@ Adds a speaker button to every message's action row, beside **Copy message**.
 Click it and a floating pill appears with elapsed time, ±10s seek, pause,
 playback speed, and stop.
 
+![The speaker button in a message's action row, and the transport pill mid-playback showing elapsed time, back ten seconds, pause, forward ten seconds, 1.5x speed, and stop](docs/player.png)
+
 No API key, no metering, and **no external binary** — synthesis speaks
 Microsoft Edge's Read Aloud protocol directly over a WebSocket.
 

@@ -35,6 +35,8 @@ threads or send a new prompt. Synthesis speaks Microsoft Edge's Read Aloud
 protocol directly, so there is no API key, no metering, and no external
 binary.
 
+![The speaker button in a message's action row, and the transport pill mid-playback showing elapsed time, back ten seconds, pause, forward ten seconds, 1.5x speed, and stop](plugins/read-aloud/docs/player.png)
+
 ```sh
 bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin read-aloud
 ```
