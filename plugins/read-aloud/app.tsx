@@ -52,6 +52,11 @@ const PREBUFFER_SECONDS = 4;
  * Coalescing cuts that churn by roughly an order of magnitude.
  */
 const APPEND_FLUSH_BYTES = 8192;
+/**
+ * Age at which a partial batch is appended anyway. Bounds how long audio can
+ * sit in hand while the buffer runs down waiting for a batch to fill.
+ */
+const APPEND_FLUSH_MS = 200;
 
 /**
  * Playback speed lives in localStorage, not plugin settings. Plugin settings
@@ -277,6 +282,7 @@ async function feedViaMediaSource(
   let appendedBytes = 0;
   let pending: Uint8Array[] = [];
   let pendingBytes = 0;
+  let lastAppendAt = Date.now();
 
   const flush = async () => {
     if (pendingBytes === 0) return;
@@ -288,6 +294,7 @@ async function feedViaMediaSource(
     }
     pending = [];
     pendingBytes = 0;
+    lastAppendAt = Date.now();
     await appended(batch);
     appendedBytes += batch.length;
     if (appendedBytes >= target) releasePlayback();
@@ -303,7 +310,17 @@ async function feedViaMediaSource(
         if (value.length > 0) {
           pending.push(value);
           pendingBytes += value.length;
-          if (pendingBytes >= APPEND_FLUSH_BYTES) await flush();
+          // Batching keeps appendBuffer off the main thread on a phone, but a
+          // size-only threshold withholds up to a batch of audio for as long
+          // as the bytes keep trickling — worst at a synthesis seam, which is
+          // exactly when the cushion can least afford it. Age is the second
+          // trigger, so a lull flushes what is already in hand.
+          if (
+            pendingBytes >= APPEND_FLUSH_BYTES ||
+            Date.now() - lastAppendAt >= APPEND_FLUSH_MS
+          ) {
+            await flush();
+          }
         }
       }
       await flush();
@@ -313,10 +330,20 @@ async function feedViaMediaSource(
       }
       // Short message, or the stream ended before the cushion filled.
       releasePlayback();
-    } catch {
-      // Abort or a mid-stream failure: stop() and the element's error handler
-      // own the user-visible outcome from here.
+    } catch (cause) {
       releasePlayback();
+      // A user abort is the expected way out; anything else means the rest of
+      // the message will never be spoken. Left silent — as this was — playback
+      // drains the buffer and stalls on "waiting" forever, which reads as the
+      // reader simply stopping partway with no explanation.
+      if (signal.aborted) return;
+      setState({
+        status: "error",
+        error:
+          cause instanceof Error
+            ? `Playback stopped early: ${cause.message}`
+            : "Playback stopped early.",
+      });
     }
   })();
 

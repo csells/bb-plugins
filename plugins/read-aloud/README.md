@@ -31,6 +31,7 @@ bb read-aloud voices en-GB     # filter the live voice catalog
 | --- | --- | --- |
 | Voice | `en-US-AndrewMultilingualNeural` | Any Microsoft neural voice |
 | Rate | `+8%` | **Synthesis** speed, baked into the audio |
+| Code blocks | `describe` | `describe` names the language and line count; `read` speaks it verbatim; `skip` stays silent |
 | Client version override | *(empty)* | Advanced; empty negotiates automatically |
 
 Playback speed is separate and lives in `localStorage`: it is a per-device UI
@@ -73,10 +74,39 @@ and never escalated, because a version you set deliberately should mean what it
 says. `bb read-aloud status` reports which version is live and whether it was
 negotiated or pinned.
 
-**One request, streamed.** The service streams a whole request incrementally —
-measured at ~1.5s to first byte and ~4.75x realtime for a six-minute message —
-so there is no text splitting and no stitching of parts. The 11-second startup
-the chunked version worked around was the Python CLI, not the service.
+**Chunked into short turns, synthesized concurrently.** The service will stream
+a whole message in one request: bytes per character stay flat at ~362 from 1K
+to 12K characters, so nothing is capped or dropped. Throughput is the problem,
+and it is nowhere near the ~4.75x realtime this once claimed. Measured end to
+end through this route, one turn at a time delivered 274s of audio in 297s of
+wall clock — **0.92x realtime, slower than it plays**, in 62 bursts separated
+by gaps of up to 7 seconds.
+
+That is the whole bug behind a read that stalls at a fixed point and never
+resumes. No prebuffer survives sub-realtime delivery: the client's head start
+is spent at a constant rate, and once it is gone playback starves for good.
+
+So the text is split at sentence boundaries and several turns are synthesized
+at once, their MP3s concatenated in order. MP3 frames are self-delimiting, so
+this needs no stitching and leaves no per-part headers to strip; the client
+sees one continuous response and starts playing on the first chunk. Three turns
+in flight took the same measurement to **4.07x realtime with 21 gaps**, which
+is the headroom the design always assumed it had.
+
+The first chunks are deliberately small (150, then 300 characters, then 400).
+Look-ahead buys nothing until the chunk being drained runs out, so a full-size
+first chunk would leave the opening minute at ~1x with no lead — the window
+where a stall is likeliest. Starting small hands over to an already-buffered
+chunk within seconds.
+
+A turn that fails is retried while nothing of it has reached the client, which
+buffering ahead makes the common case; a turn that fails after bytes are
+downstream is raised rather than swallowed, costing that chunk instead of the
+rest of the message.
+
+One measurement trap worth recording: re-reading the *same* text returns at
+~112x realtime with a byte-identical body. That is the service serving a cached
+synthesis, not a fix working. Benchmark with fresh wording every time.
 
 **Two routes, not one.** `POST /prepare` takes the message text and returns a
 job id; `GET /stream?id=` returns `audio/mpeg`. A single GET would be simpler,
@@ -99,10 +129,27 @@ more audio arrives. Engines without MSE for mp3 fall back to direct streaming,
 where playback works but jumps are smaller.
 
 **Markdown is flattened first.** Raw markdown through a TTS engine says "hash
-hash Loose ends" and spells out URLs character by character. Code fences become
-"(code block omitted)" rather than vanishing silently, links reduce to their
-labels, tables become comma clauses, and headings gain a full stop so the voice
-lands.
+hash Loose ends" and spells out URLs character by character. Links reduce to
+their labels and headings gain a full stop so the voice lands.
+
+Two constructs need more than stripping, because they carry meaning in their
+layout and a listener has no layout:
+
+- **Tables** are linearized with every cell paired to its column header, and
+  the first column used as the row's label — "Signal. Fixed: HOLD. Risk-based:
+  CUT." Flattening a row to "Signal, HOLD, CUT" is wordier to read and
+  impossible to follow by ear, since position is the only thing saying which
+  value belongs to which column.
+- **Code fences** are named rather than read: "(python code block, 12 lines)".
+  Braces and indentation are noise aloud, but silence leaves the listener
+  unable to judge whether to go and look. Set **Code blocks** to `read` to hear
+  the code verbatim, or `skip` for silence.
+
+Fences and tables are found by scanning lines, not by regex over the whole
+message: a regex pairs fences positionally, so one stray fence swallows every
+word up to the next one. Money and rate shorthand is spoken as words, so
+"$120K/yr" comes out as "$120 thousand per year" rather than as letters and a
+slash.
 
 **Auto-stop** happens two ways. Switching threads is detected in the overlay
 via `useBbContext()`. New prompts go through the backend: `thread.active`

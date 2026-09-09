@@ -18,11 +18,14 @@ you somewhere else.
 ## How it works
 
 Markdown is written to be read, not heard, so the text is flattened before it
-is spoken. Fenced code becomes a short spoken marker instead of hundreds of
-characters of syntax. Links keep their label and drop their target. Bare URLs
-come out entirely, since a voice reads them one character at a time. Headings
-gain a full stop so the voice lands before the next sentence, and table rows
-become comma-separated clauses instead of a run of pipes.
+is spoken. Fenced code is named by language and length — "(python code block,
+12 lines)" — instead of hundreds of characters of syntax, and can be read
+verbatim or skipped instead. Table rows are linearized with every cell paired
+to its column header, because position is what tells a reader which value
+belongs to which column and a listener cannot see position. Links keep their
+label and drop their target. Bare URLs come out entirely, since a voice reads
+them one character at a time. Headings gain a full stop so the voice lands
+before the next sentence.
 
 Speech comes from the same online neural voices that Microsoft Edge uses for
 its own read-aloud feature. The plugin speaks that protocol directly over a
