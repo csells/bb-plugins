@@ -650,13 +650,13 @@ function ReadAloudPlayer() {
       {isBusy ? (
         <Icon
           name="Loading"
-          className="text-muted-foreground mr-1 size-3.5 shrink-0 animate-spin"
+          className="text-muted-foreground mr-1 size-4 shrink-0 animate-spin max-md:pointer-coarse:size-5"
           aria-hidden
         />
       ) : (
         <SpeakerGlyph
           className={cn(
-            "mr-1 size-3.5 shrink-0",
+            "mr-1 size-4 shrink-0 max-md:pointer-coarse:size-5",
             isError ? "text-destructive" : "text-muted-foreground",
           )}
         />
