@@ -14,6 +14,10 @@
     {
       "name": "read-aloud",
       "source": "./plugins/read-aloud"
+    },
+    {
+      "name": "fat-fingers",
+      "source": "./plugins/fat-fingers"
     }
   ]
 }

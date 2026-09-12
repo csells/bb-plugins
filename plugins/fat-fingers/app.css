@@ -1,0 +1,36 @@
+/*
+ * Fat Fingers: 50% larger icons on a phone.
+ *
+ * "On a phone" is bb's own definition — the media query below is the one bb
+ * uses for its coarse-pointer sizing, so a narrow desktop window with a mouse
+ * is left alone and a phone held sideways still counts.
+ *
+ * `zoom` rather than `transform: scale()` because zoom changes the layout box:
+ * the icon really is bigger, its container grows to fit, and the tap target a
+ * wrapping button offers grows with it. A transform would only paint it larger
+ * while leaving a 16px box for a finger to find. `zoom` is standard in every
+ * current browser (Firefox since 126).
+ *
+ * The selectors name bb's icon-rendering paths rather than every <svg>, so a
+ * diagram or image rendered inside a message is not blown up too:
+ *   svg[data-icon]              every glyph drawn through bb's Icon component,
+ *                               including vendored copies inside other plugins
+ *   svg.lucide                  the few shadcn primitives that ship lucide glyphs
+ *   [data-plugin-icon-asset]    a plugin's own SVG mark, drawn as a CSS mask
+ *   [data-provider-logo]        a provider's logo, drawn the same way
+ *
+ * Only active while the plugin's content script has set data-fat-fingers on
+ * <html>, so disabling the plugin removes the effect at once.
+ */
+html[data-fat-fingers] {
+  --fat-fingers-scale: 1.5;
+}
+
+@media (max-width: 767px) and (pointer: coarse) {
+  html[data-fat-fingers] svg[data-icon],
+  html[data-fat-fingers] svg.lucide,
+  html[data-fat-fingers] [data-plugin-icon-asset],
+  html[data-fat-fingers] [data-provider-logo] {
+    zoom: var(--fat-fingers-scale);
+  }
+}

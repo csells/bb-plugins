@@ -41,6 +41,16 @@ binary.
 bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin read-aloud
 ```
 
+## Fat Fingers
+
+`plugins/fat-fingers` makes every icon 50% larger when bb is open on a phone,
+using the same phone test bb applies to its own coarse-pointer sizing. Desktop
+layouts are untouched, and diagrams and images inside messages are left alone.
+
+```sh
+bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin fat-fingers
+```
+
 Development commands:
 
 ```sh
