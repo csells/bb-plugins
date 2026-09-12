@@ -20,9 +20,8 @@ The same thing bb thinks counts as a phone: a viewport at most 767px wide
 own coarse-pointer sizing, so this plugin follows bb's decision rather than
 inventing a second one. A narrow desktop window with a mouse stays as it was.
 
-The scaling applies to the bb web app opened in a phone browser, including a
-remote `getbb.app` link and a home-screen install. It does not reach the
-native bb mobile app, which does not run plugin frontends.
+The scaling applies wherever bb runs on a phone: the native bb mobile app, a
+phone browser opened on a remote `getbb.app` link, and a home-screen install.
 
 ## What gets scaled
 

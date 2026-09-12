@@ -497,10 +497,21 @@ function formatClock(seconds: number): string {
  * therefore the glyph BB draws on the message action button. Kept inline and in
  * sync deliberately: the pill's status icon has to read as "this is the read
  * aloud thing", not as a second play button competing with the real one.
+ *
+ * Both hand-drawn glyphs here carry `data-icon`, the marker bb's Icon component
+ * puts on every glyph it draws. Anything that finds bb's icons by that marker
+ * (the Fat Fingers plugin, a theme) then treats these the same as the Pause and
+ * Stop glyphs beside them, instead of scaling two of the five and not the rest.
  */
 function SpeakerGlyph({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      aria-hidden
+      data-icon="read-aloud-speaker"
+    >
       <path d="M13 4.5a1 1 0 0 0-1.7-.7L7.2 8H4a1.5 1.5 0 0 0-1.5 1.5v5A1.5 1.5 0 0 0 4 16h3.2l4.1 4.2a1 1 0 0 0 1.7-.7v-15z" />
       <path d="M16.2 8.3a1 1 0 0 1 1.4 0 5.5 5.5 0 0 1 0 7.4 1 1 0 0 1-1.4-1.4 3.5 3.5 0 0 0 0-4.6 1 1 0 0 1 0-1.4z" />
       <path d="M19.1 5.4a1 1 0 0 1 1.4 0 9.5 9.5 0 0 1 0 13.2 1 1 0 0 1-1.4-1.4 7.5 7.5 0 0 0 0-10.4 1 1 0 0 1 0-1.4z" />
@@ -516,6 +527,7 @@ function SeekGlyph({ forward }: { forward: boolean }) {
       className={cn("size-full", forward && "-scale-x-100")}
       fill="none"
       aria-hidden
+      data-icon={forward ? "read-aloud-seek-forward" : "read-aloud-seek-back"}
     >
       <path
         d="M12 5.2a6.8 6.8 0 1 0 6.6 8.4"

@@ -17,7 +17,8 @@ larger. Diagrams and images inside messages are not touched.
 
 It scales the glyphs from bb's icon set, the plugin marks and provider logos
 bb draws as masks, and the few lucide glyphs in shadcn primitives. Icons
-rendered by other plugins that use bb's icon component are scaled too.
+rendered by other plugins are scaled too when they use bb's icon component or
+carry its `data-icon` marker.
 
 Disable the plugin and the icons return to their normal size at once.
 
@@ -26,8 +27,8 @@ Disable the plugin and the icons return to their normal size at once.
 Nothing to configure. There are no settings, no commands, and no network
 access. Turn it on and pick up your phone.
 
-It applies to the bb web app in a phone browser, including a remote
-`getbb.app` link. The native bb mobile app does not load plugin frontends.
+It works in the native bb mobile app and in a phone browser, including a
+remote `getbb.app` link.
 
 The source is at
 [github.com/csells/bb-plugins](https://github.com/csells/bb-plugins).
