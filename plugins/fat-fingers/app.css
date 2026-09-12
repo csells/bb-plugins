@@ -33,4 +33,17 @@ html[data-fat-fingers] {
   html[data-fat-fingers] [data-provider-logo] {
     zoom: var(--fat-fingers-scale);
   }
+
+  /*
+   * bb's icon buttons bump their glyph to at least 16px on a phone with a
+   * descendant rule that names <svg>, so a plugin mark or provider logo (a
+   * <span> drawn as a mask) in the same button keeps its desktop 12px and
+   * ends up two thirds the size of its neighbours, before and after scaling.
+   * Give those spans the same floor so one action row scales as one set.
+   */
+  html[data-fat-fingers] button [data-plugin-icon-asset],
+  html[data-fat-fingers] button [data-provider-logo] {
+    min-width: 1rem;
+    min-height: 1rem;
+  }
 }
