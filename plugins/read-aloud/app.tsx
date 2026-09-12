@@ -519,12 +519,19 @@ function SpeakerGlyph({ className }: { className?: string }) {
   );
 }
 
-/** Circular arrow with the jump size inside it, mirrored for forward. */
+/**
+ * Circular arrow with the jump size inside it, mirrored for forward. Sized
+ * directly, like the Pause and Stop glyphs beside it, so the button centers it
+ * and anything that enlarges bb's icons grows the glyph rather than a wrapper.
+ */
 function SeekGlyph({ forward }: { forward: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={cn("size-full", forward && "-scale-x-100")}
+      className={cn(
+        "size-4 max-md:pointer-coarse:size-5",
+        forward && "-scale-x-100",
+      )}
       fill="none"
       aria-hidden
       data-icon={forward ? "read-aloud-seek-forward" : "read-aloud-seek-back"}
@@ -683,9 +690,7 @@ function ReadAloudPlayer() {
             label="Back 10 seconds"
             disabled={isPreparing}
           >
-            <span className="size-4 max-md:pointer-coarse:size-5">
-              <SeekGlyph forward={false} />
-            </span>
+            <SeekGlyph forward={false} />
           </TransportButton>
 
           {player.status === "paused" ? (
@@ -715,9 +720,7 @@ function ReadAloudPlayer() {
             label="Forward 10 seconds"
             disabled={isPreparing}
           >
-            <span className="size-4 max-md:pointer-coarse:size-5">
-              <SeekGlyph forward />
-            </span>
+            <SeekGlyph forward />
           </TransportButton>
 
           <button
