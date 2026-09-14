@@ -40,6 +40,15 @@ drawn as a CSS mask, so a plugin's own button icon (Read Aloud's speaker,
 say) sat at two thirds the size of its neighbours. Those get the same 16px
 floor here, so a message's action row scales as one set.
 
+## Room between the buttons
+
+A bigger glyph in a button that did not grow just moves the neighbours
+closer. bb packs its action-row buttons at 28px on a phone, so with 24px
+glyphs a finger had 4px of margin before it hit the next one. Any button
+that is nothing but an icon is widened to 44px, the tap target phones are
+designed around, so the glyph centres move apart with it. Height is left to
+bb's rows: a mis-tap above or below lands on text, not on another button.
+
 ## Tuning
 
 The factor lives in one CSS custom property, `--fat-fingers-scale` (default

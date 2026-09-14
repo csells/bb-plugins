@@ -46,4 +46,36 @@ html[data-fat-fingers] {
     min-width: 1rem;
     min-height: 1rem;
   }
+
+  /*
+   * Bigger glyphs alone left the buttons around them touching. bb packs its
+   * action-row buttons at 28px edge to edge, so a 24px glyph leaves a finger
+   * 4px of margin before it lands on the neighbour. Widen any button that is
+   * nothing but an icon (an icon, optionally with screen-reader-only text) to
+   * the 44px target phones are designed around. Row spacing comes from the
+   * button box, so the glyph centres move apart with it. Height is left to
+   * bb's own row sizing: a mis-tap above or below lands on text, not on
+   * another button.
+   */
+  html[data-fat-fingers]
+    :is(button, [role="button"]):has(
+      > :is(
+          svg[data-icon],
+          svg.lucide,
+          [data-plugin-icon-asset],
+          [data-provider-logo]
+        )
+    ):not(
+      :has(
+        > :not(
+            svg[data-icon],
+            svg.lucide,
+            [data-plugin-icon-asset],
+            [data-provider-logo],
+            .sr-only
+          )
+      )
+    ) {
+    min-width: 2.75rem;
+  }
 }
