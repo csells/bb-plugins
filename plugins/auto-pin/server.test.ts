@@ -31,10 +31,63 @@ describe("auto-pin", () => {
     await harness.lifecycle.dispose();
   });
 
+  it("pins an existing visible unpinned root thread when it becomes active", async () => {
+    const pin = vi.fn(async () => ({ success: true }));
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "auto-pin",
+      sdk: { threads: { pin } },
+    });
+    plugin(bb);
+
+    await harness.behavior.emitThreadEvent("thread.active", {
+      thread: makeThreadResponse({
+        id: "thread-existing",
+        visibility: "visible",
+        parentThreadId: null,
+        pinnedAt: null,
+      }),
+    });
+
+    expect(pin).toHaveBeenCalledOnce();
+    expect(pin).toHaveBeenCalledWith({ threadId: "thread-existing" });
+    await harness.lifecycle.dispose();
+  });
+
+  it("does not submit duplicate pins when creation and activation overlap", async () => {
+    let finishPin: (() => void) | undefined;
+    const pin = vi.fn(
+      () =>
+        new Promise<{ success: true }>((resolve) => {
+          finishPin = () => {
+            resolve({ success: true });
+          };
+        }),
+    );
+    const { bb, harness } = createFakePluginHost({
+      pluginId: "auto-pin",
+      sdk: { threads: { pin } },
+    });
+    plugin(bb);
+    const thread = makeThreadResponse({
+      id: "thread-overlap",
+      visibility: "visible",
+      parentThreadId: null,
+      pinnedAt: null,
+    });
+
+    const created = harness.behavior.emitThreadEvent("thread.created", { thread });
+    const active = harness.behavior.emitThreadEvent("thread.active", { thread });
+
+    expect(pin).toHaveBeenCalledOnce();
+    finishPin?.();
+    await Promise.all([created, active]);
+    await harness.lifecycle.dispose();
+  });
+
   it.each([
     ["hidden", { visibility: "hidden" as const }],
     ["child", { parentThreadId: "thread-parent" }],
-    ["already pinned", { pinnedAt: 1 }],
+    ["already-pinned", { pinnedAt: 1 }],
   ])("ignores a %s thread", async (_description, overrides) => {
     const pin = vi.fn(async () => ({ success: true }));
     const { bb, harness } = createFakePluginHost({
