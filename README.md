@@ -51,6 +51,21 @@ layouts are untouched, and diagrams and images inside messages are left alone.
 bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin fat-fingers
 ```
 
+## Jarvis
+
+`plugins/jarvis` is a voice-first assistant that sits on top of every thread.
+Open it in the sidebar and tap the orb to talk: it listens, answers out loud with
+word-by-word captions, and puts tables, code, and lists on screen instead of
+reading them. It hears about other threads through BB events, so it tells you
+when one finishes, fails, or is waiting on you, and it can answer or instruct
+them for you. Its brain is a pinned Claude thread; its voice is the same keyless
+Edge neural voice Read Aloud uses. It is called Jarvis until you rename it in
+its settings.
+
+```sh
+bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin jarvis
+```
+
 Development commands:
 
 ```sh

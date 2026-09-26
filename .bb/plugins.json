@@ -18,6 +18,10 @@
     {
       "name": "fat-fingers",
       "source": "./plugins/fat-fingers"
+    },
+    {
+      "name": "jarvis",
+      "source": "./plugins/jarvis"
     }
   ]
 }

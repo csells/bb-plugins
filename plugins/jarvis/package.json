@@ -1,0 +1,40 @@
+{
+  "name": "bb-plugin-jarvis",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "bb plugin build",
+    "test": "vitest run --reporter=verbose",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "engines": {
+    "bb": ">=0.43",
+    "bbPluginSdk": ">=0.4.104"
+  },
+  "bb": {
+    "name": "Jarvis",
+    "description": "A voice-first assistant on top of every thread: talk to it, hear what your agents are doing, and answer them by voice.",
+    "branding": {
+      "icon": "./assets/jarvis.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
+  },
+  "dependencies": {
+    "ws": "^8.21.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.9",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/ws": "^8.18.1",
+    "hono": "^4.11.9",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}
