@@ -37,7 +37,10 @@ it("the message action exposes Play after gesture denial, resumes, then Stop can
   let sequence = 0;
   vi.stubGlobal("URL", { createObjectURL: () => `blob:${++sequence}`, revokeObjectURL: () => { /* fixture */ } });
   const fetching = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    if (init?.method === "DELETE") return new Response(JSON.stringify({ stopped: true }));
+    if (init?.method === "DELETE") {
+      if (new Headers(init.headers).get("Content-Type") !== "application/json") return new Response("JSON required", { status: 415 });
+      return new Response(JSON.stringify({ stopped: true }));
+    }
     if (typeof input === "string" && input.includes("prepare-clips")) return new Response(JSON.stringify({ id: "job1", sections: 2 }));
     return new Response(new Uint8Array(12_000), { headers: { "Content-Type": "audio/mpeg" } });
   });
@@ -58,6 +61,9 @@ it("the message action exposes Play after gesture denial, resumes, then Stop can
     expect(created[0]?.src).toBe("blob:1");
     await act(async () => { fireEvent.click(player.getByLabelText("Stop")); });
     expect(player.queryByText("Reading assistant message")).toBeNull();
-    expect(fetching.mock.calls.some(([url, init]) => typeof url === "string" && url.includes("clips?id=job1") && init?.method === "DELETE")).toBe(true);
+    const cancellation = fetching.mock.calls.find(([url, init]) => typeof url === "string" && url.includes("clips?id=job1") && init?.method === "DELETE");
+    expect(cancellation).toBeDefined();
+    expect(new Headers(cancellation?.[1]?.headers).get("Content-Type")).toBe("application/json");
+    expect(cancellation?.[1]?.body).toBe("{}");
   } finally { player.lifecycle.unmount(); }
 });

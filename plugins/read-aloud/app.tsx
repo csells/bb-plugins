@@ -398,7 +398,7 @@ function stop(): void {
   clipPlayer?.dispose();
   clipPlayer = null;
   if (clipJobId !== null) {
-    void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(clipJobId)}`, { method: "DELETE" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
+    void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(clipJobId)}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
     clipJobId = null;
   }
   lastRenderedSecond = -1;
@@ -512,7 +512,7 @@ async function speak(input: {
     }
     const { id, sections } = (await response.json()) as { id: string; sections?: number };
     if (mine !== generation) {
-      if (useClips) void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
+      if (useClips) void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(id)}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
       return;
     }
 
