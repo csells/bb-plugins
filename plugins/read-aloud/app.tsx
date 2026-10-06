@@ -21,6 +21,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { COARSE_POINTER_COMPACT_ICON_BUTTON_CLASS } from "@/components/ui/coarse-pointer-sizing";
 import { cn } from "@/lib/utils";
+import { ClipPlayer, unlockAudio } from "./clip-player";
 
 /** Routes are namespaced by plugin id; auth "local" accepts the BB app origin. */
 const PLUGIN_ROUTE = "/api/v1/plugins/read-aloud/http";
@@ -98,6 +99,7 @@ type Status =
   | "buffering"
   | "playing"
   | "paused"
+  | "ready"
   | "error";
 
 interface PlayerState {
@@ -146,6 +148,11 @@ let generation = 0;
 
 /** One element for the whole app, created lazily on first use. */
 let audio: HTMLAudioElement | null = null;
+let clipPlayer: ClipPlayer | null = null;
+let clipJobId: string | null = null;
+let lastInput: { threadId: string; text: string; label: string } | null = null;
+let waitTimer: ReturnType<typeof setTimeout> | null = null;
+let priming = false;
 /** Last whole second pushed to the store, so the clock re-renders once a second. */
 let lastRenderedSecond = -1;
 
@@ -164,20 +171,23 @@ function ensureAudio(): HTMLAudioElement {
     const whole = Math.floor(element.currentTime);
     if (whole === lastRenderedSecond) return;
     lastRenderedSecond = whole;
-    setState({ position: element.currentTime });
+    setState({ position: clipPlayer?.position() ?? element.currentTime });
   };
 
   element.addEventListener("playing", () => {
+    if (priming) return;
+    if (waitTimer !== null) clearTimeout(waitTimer);
     setState({ status: "playing", error: null });
   });
   element.addEventListener("pause", () => {
     // Clearing src to stop also fires "pause". Only a pause on a still-loaded
     // element is a real pause; otherwise stop() already set the state.
-    if (element.getAttribute("src") !== null && !element.ended) {
+    if (!priming && getState().status !== "loading" && element.getAttribute("src") !== null && !element.ended) {
       setState({ status: "paused" });
     }
   });
   element.addEventListener("ended", () => {
+    if (priming || clipPlayer !== null) return;
     stop();
   });
   // Starved mid-stream. Distinct from a user pause (paused stays false) and
@@ -185,14 +195,18 @@ function ensureAudio(): HTMLAudioElement {
   // "waiting" also fires before the first frame and right after a seek.
   const onStarved = () => {
     if (element.getAttribute("src") === null) return;
-    if (getState().status === "playing") setState({ status: "buffering" });
+    if (getState().status === "playing") {
+      setState({ status: "buffering" });
+      armWaitTimeout();
+    }
   };
   element.addEventListener("waiting", onStarved);
   element.addEventListener("stalled", onStarved);
   element.addEventListener("timeupdate", syncProgress);
   element.addEventListener("error", () => {
     // A cleared src reports MEDIA_ELEMENT_ERROR; that is our own teardown.
-    if (element.getAttribute("src") === null) return;
+    if (priming || element.getAttribute("src") === null) return;
+    if (waitTimer !== null) clearTimeout(waitTimer);
     setState({
       status: "error",
       error: "Playback failed. Check `bb read-aloud status`.",
@@ -235,10 +249,18 @@ async function feedViaMediaSource(
   element.src = objectUrl;
 
   await new Promise<void>((resolve, reject) => {
-    mediaSource.addEventListener("sourceopen", () => { resolve(); }, { once: true });
-    mediaSource.addEventListener("error", () => { reject(new Error("MediaSource failed")); }, {
-      once: true,
-    });
+    const clean = () => {
+      mediaSource.removeEventListener("sourceopen", onOpen);
+      mediaSource.removeEventListener("error", onError);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onOpen = () => { clean(); resolve(); };
+    const onError = () => { clean(); reject(new Error("MediaSource failed")); };
+    const onAbort = () => { clean(); reject(new Error("Read stopped")); };
+    mediaSource.addEventListener("sourceopen", onOpen, { once: true });
+    mediaSource.addEventListener("error", onError, { once: true });
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
   });
   if (signal.aborted) return;
 
@@ -358,8 +380,27 @@ async function feedViaMediaSource(
  * cancel() and closes the synthesis socket — so stopping a long read costs
  * nothing rather than letting it finish unheard.
  */
+function armWaitTimeout(): void {
+  if (waitTimer !== null) clearTimeout(waitTimer);
+  const mine = generation;
+  waitTimer = setTimeout(() => {
+    if (mine !== generation) return;
+    stop();
+    setState({ status: "error", error: "Audio took too long to start. Retry." });
+  }, 45_000);
+}
+
 function stop(): void {
   generation += 1;
+  priming = false;
+  if (waitTimer !== null) clearTimeout(waitTimer);
+  waitTimer = null;
+  clipPlayer?.dispose();
+  clipPlayer = null;
+  if (clipJobId !== null) {
+    void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(clipJobId)}`, { method: "DELETE" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
+    clipJobId = null;
+  }
   lastRenderedSecond = -1;
   inFlight?.abort();
   inFlight = null;
@@ -378,11 +419,14 @@ function stop(): void {
 }
 
 function pause(): void {
+  if (waitTimer !== null) clearTimeout(waitTimer);
   audio?.pause();
 }
 
 function resume(): void {
+  armWaitTimeout();
   void audio?.play().catch(() => {
+    if (waitTimer !== null) clearTimeout(waitTimer);
     setState({ status: "error", error: "Could not resume playback." });
   });
 }
@@ -402,6 +446,7 @@ function resume(): void {
  * forwarded past what exists yet".
  */
 function seekBy(delta: number): void {
+  if (clipPlayer !== null) { clipPlayer.seekBy(delta); return; }
   const element = audio;
   if (element === null) return;
   const bufferedEnd =
@@ -437,6 +482,13 @@ async function speak(input: {
 }): Promise<void> {
   stop();
   const mine = ++generation;
+  lastInput = input;
+  const element = ensureAudio();
+  const useClips = !canUseMediaSource();
+  if (useClips) { priming = true; unlockAudio(element); }
+  const controller = new AbortController();
+  inFlight = controller;
+  armWaitTimeout();
   setState({
     status: "loading",
     threadId: input.threadId,
@@ -446,10 +498,11 @@ async function speak(input: {
   });
 
   try {
-    const response = await fetch(`${PLUGIN_ROUTE}/prepare`, {
+    const response = await fetch(`${PLUGIN_ROUTE}/${useClips ? "prepare-clips" : "prepare"}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: input.text }),
+      signal: controller.signal,
     });
     if (!response.ok) {
       const detail = (await response.json().catch(() => ({}))) as {
@@ -457,21 +510,36 @@ async function speak(input: {
       };
       throw new Error(detail.error ?? `prepare failed (${response.status})`);
     }
-    const { id } = (await response.json()) as { id: string };
-    if (mine !== generation) return; // Stopped while preparing.
-
-    const element = ensureAudio();
-    const url = `${PLUGIN_ROUTE}/stream?id=${encodeURIComponent(id)}`;
-    const controller = new AbortController();
-    inFlight = controller;
-
-    if (canUseMediaSource()) {
-      await feedViaMediaSource(element, url, controller.signal);
-    } else {
-      // Fallback for engines without MSE for mp3: playback works, but the
-      // browser buffers barely ahead, so a 10-second jump moves less.
-      element.src = url;
+    const { id, sections } = (await response.json()) as { id: string; sections?: number };
+    if (mine !== generation) {
+      if (useClips) void fetch(`${PLUGIN_ROUTE}/clips?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => { /* Stop/prefetch failures are handled by the next active read. */ });
+      return;
     }
+
+    element.playbackRate = state.rate;
+    if (useClips) {
+      if (!Number.isInteger(sections) || (sections ?? 0) < 1) throw new Error("Invalid audio preparation response");
+      clipJobId = id;
+      clipPlayer = new ClipPlayer({
+        audio: element,
+        urls: Array.from({ length: sections ?? 0 }, (_, index) => `${PLUGIN_ROUTE}/clip?id=${encodeURIComponent(id)}&index=${index}`),
+        signal: controller.signal,
+        onStatus: (status, error) => {
+          if (mine !== generation) return;
+          priming = status === "loading";
+          if (status === "ready" || status === "error") {
+            if (waitTimer !== null) clearTimeout(waitTimer);
+          } else if (status === "loading") armWaitTimeout();
+          setState({ status, error: error ?? null });
+        },
+        onEnd: stop,
+      });
+      await clipPlayer.start();
+      return;
+    }
+
+    const url = `${PLUGIN_ROUTE}/stream?id=${encodeURIComponent(id)}`;
+    await feedViaMediaSource(element, url, controller.signal);
     if (mine !== generation) return; // Stopped while connecting.
 
     // Apply the stored preference before play(), including on a fresh element.
@@ -479,6 +547,8 @@ async function speak(input: {
     await element.play();
   } catch (cause) {
     if (mine !== generation) return;
+    if (waitTimer !== null) clearTimeout(waitTimer);
+    priming = false;
     setState({
       status: "error",
       error: cause instanceof Error ? cause.message : String(cause),
@@ -666,11 +736,13 @@ function ReadAloudPlayer() {
       <span
         className={cn(
           "mr-1 truncate text-xs",
-          isError ? "max-w-[16rem]" : "hidden max-w-[14rem] sm:inline",
+          isError || player.status === "ready" ? "max-w-[16rem]" : "hidden max-w-[14rem] sm:inline",
         )}
       >
         {isError
           ? (player.error ?? "Playback failed")
+          : player.status === "ready"
+            ? "Ready — tap Play"
           : isBusy
             ? `Preparing ${player.label}…`
             : `Reading ${player.label}`}
@@ -693,8 +765,8 @@ function ReadAloudPlayer() {
             <SeekGlyph forward={false} />
           </TransportButton>
 
-          {player.status === "paused" ? (
-            <TransportButton onClick={resume} label="Resume">
+          {player.status === "paused" || player.status === "ready" ? (
+            <TransportButton onClick={resume} label={player.status === "ready" ? "Play" : "Resume"}>
               <Icon
                 name="Play"
                 className="size-4 max-md:pointer-coarse:size-5"
@@ -741,6 +813,11 @@ function ReadAloudPlayer() {
         </>
       )}
 
+      {isError && lastInput !== null && (
+        <TransportButton onClick={() => { if (lastInput !== null) void speak(lastInput); }} label="Retry">
+          <Icon name="Play" className="size-4 max-md:pointer-coarse:size-5" aria-hidden />
+        </TransportButton>
+      )}
       <TransportButton onClick={stop} label={isError ? "Dismiss" : "Stop"}>
         <Icon
           name="Square"

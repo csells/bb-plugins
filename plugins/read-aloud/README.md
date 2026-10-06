@@ -163,6 +163,32 @@ siblings of itself. The button triggers; `experimental_appOverlay` renders the
 transport. A module-level store bridges them, because `run` fires outside React
 and the overlay mounts and unmounts underneath it.
 
+## iPhone, iPad, and other browsers without MP3 MediaSource
+
+These browsers receive short, complete MP3 sections rather than a single-use
+live stream. Three sections are downloaded ahead on the same audio element,
+so the first section can play without waiting for the entire message. Only
+that window is kept in the browser; going back downloads the reusable section
+again. Voice, synthesis rate, and playback speed are preserved.
+
+The audio element is authorized during the speaker-button gesture. If iOS
+still requires a gesture after preparation, the player shows **Ready — tap
+Play** rather than spinning. Downloads time out after 35 seconds, stalled
+playback after 45 seconds, and failures expose a Retry button.
+
+`POST /prepare-clips` returns a job and section count. `GET /clip?id=&index=`
+returns a finite MP3 with Content-Length and correct single-byte range support
+(206/416), and can be requested repeatedly. `DELETE /clips?id=` stops the read
+and aborts its synthesis. Jobs snapshot the voice/rate, expire after 20 idle
+minutes, and are limited to eight readers. The global audio cache caps at
+32 MiB; old sections can be synthesized again after eviction. A section is
+limited to 2 MiB and generation to 30 seconds. Selection input caps at 50,000
+characters; larger messages can be read in selections. Reload disposes all jobs.
+
+Desktop browsers with MP3 MediaSource keep continuous streaming playback.
+Speech handshakes and idle sockets now time out, and a connection that closes
+before turn.end is reported as incomplete instead of returning truncated audio.
+
 ## Mobile
 
 Touch targets grow on coarse pointers using BB's own `coarse-pointer-sizing`
@@ -177,8 +203,10 @@ drops its text label first on narrow screens so the controls always fit.
   need a code change, as it would for every client.
 - Voice catalog only — no cloning, and no control over the 24kHz/48kbps output
   format.
-- Without MSE for mp3, ±10s jumps are limited by how little the browser
-  buffers ahead.
+- Without MP3 MediaSource, skipping forward stops at the end of the current
+  audio section. Backward skips can cross previously played sections.
+- An iOS PWA can suspend media when backgrounded or the screen locks; playback
+  on a physical iPhone still needs device verification.
 
 ## Selection reading
 

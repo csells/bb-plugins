@@ -149,18 +149,23 @@ function localeOf(voice: string): string {
 }
 
 /** Resolves once the socket is open, rejects if the handshake is refused. */
-function openSocket(version: string): Promise<WebSocket> {
+function openSocket(version: string, signal?: AbortSignal): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted === true) { reject(new Error("aborted")); return; }
     const url =
       `wss://${BASE}/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}` +
       `&${authQuery(version)}&ConnectionId=${randomUUID().replace(/-/g, "")}`;
-    const socket = new WebSocket(url, { headers: handshakeHeaders(version) });
+    const socket = new WebSocket(url, { headers: handshakeHeaders(version), handshakeTimeout: 8_000 });
     socket.binaryType = "nodebuffer";
+    const onAbort = () => { socket.terminate(); };
+    signal?.addEventListener("abort", onAbort, { once: true });
     const onOpen = () => {
+      signal?.removeEventListener("abort", onAbort);
       socket.off("error", onError);
       resolve(socket);
     };
     const onError = (cause: Error) => {
+      signal?.removeEventListener("abort", onAbort);
       socket.off("open", onOpen);
       try {
         socket.close();
@@ -178,12 +183,13 @@ function openSocket(version: string): Promise<WebSocket> {
  * Opens a socket, escalating the client version if the handshake is refused,
  * and remembers whichever version worked.
  */
-async function connect(): Promise<WebSocket> {
+async function connect(signal?: AbortSignal): Promise<WebSocket> {
   const candidates = candidateVersions();
   let last: Error | null = null;
   for (const version of candidates) {
+    if (signal?.aborted === true) throw new Error("aborted");
     try {
-      const socket = await openSocket(version);
+      const socket = await openSocket(version, signal);
       if (version !== learnedVersion) {
         learnedVersion = version;
         // Only worth persisting when it differs from the shipped default.
@@ -220,7 +226,7 @@ export async function* synthesize(
   const { text, voice, rate = "", signal } = options;
   if (text.trim() === "") return;
 
-  const socket = await connect();
+  const socket = await connect(signal);
   if (signal?.aborted === true) {
     socket.close();
     return;
@@ -229,6 +235,7 @@ export async function* synthesize(
   // Bridge push-based socket events into pull-based iteration.
   const queue: Uint8Array[] = [];
   const done = { current: false };
+  let turnEnded = false;
   const failure: { current: Error | null } = { current: null };
   let wake: (() => void) | null = null;
   const notify = () => {
@@ -247,8 +254,20 @@ export async function* synthesize(
     notify();
   };
   signal?.addEventListener("abort", abort, { once: true });
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const resetIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      failure.current = new Error("Speech service stopped responding. Retry.");
+      done.current = true;
+      socket.terminate();
+      notify();
+    }, 20_000);
+  };
+  resetIdle();
 
   socket.on("message", (data: Buffer, isBinary: boolean) => {
+    resetIdle();
     if (isBinary) {
       // Frame layout: uint16be header length, headers, then the payload.
       if (data.length < 2) return;
@@ -263,6 +282,7 @@ export async function* synthesize(
     }
     // Text frames carry turn.start / response / turn.end.
     if (data.toString("utf8").includes("Path:turn.end")) {
+      turnEnded = true;
       done.current = true;
       try {
         socket.close();
@@ -279,6 +299,7 @@ export async function* synthesize(
     notify();
   });
   socket.on("close", () => {
+    if (!turnEnded && failure.current === null) failure.current = new Error("Speech connection closed before the audio finished. Retry.");
     done.current = true;
     notify();
   });
@@ -336,6 +357,7 @@ export async function* synthesize(
       throw failure.current;
     }
   } finally {
+    clearTimeout(idleTimer);
     signal?.removeEventListener("abort", abort);
     try {
       socket.close();

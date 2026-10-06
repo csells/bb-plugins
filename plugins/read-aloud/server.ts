@@ -16,6 +16,7 @@
 import { randomUUID } from "node:crypto";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { audioResponse, ClipError, ClipStore } from "./clips";
 import {
   activeClientVersion,
   configureClientVersion,
@@ -400,6 +401,43 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const jobs = new Map<string, Job>();
+  const clips = new ClipStore();
+  const clipSweep = setInterval(() => { clips.sweep(); }, 60_000);
+  bb.onDispose(() => { clearInterval(clipSweep); clips.dispose(); });
+
+  bb.http.route("POST", "/prepare-clips", async (context) => {
+    const parsed = z.object({ text: z.string().min(1).max(50_000) })
+      .safeParse(await context.req.json().catch(() => null));
+    if (!parsed.success) return context.json({ error: "Choose between 1 and 50,000 characters to read." }, 400);
+    const { codeBlocks, voice, rate } = await settings.get();
+    const text = toSpeakable(parsed.data.text, { codeBlocks: codeBlocks as CodeBlockMode });
+    if (text === "") return context.json({ error: "Nothing to speak" }, 400);
+    const chunks = chunkForSynthesis(text);
+    try {
+      const id = clips.prepare(chunks, voice, rate);
+      return context.json({ id, sections: chunks.length });
+    } catch (cause) {
+      if (cause instanceof ClipError) return context.json({ error: cause.message }, cause.status);
+      throw cause;
+    }
+  }, { auth: "local" });
+
+  bb.http.route("GET", "/clip", async (context) => {
+    const id = context.req.query("id") ?? "";
+    const rawIndex = context.req.query("index") ?? "";
+    if (!/^\d+$/.test(rawIndex)) return context.json({ error: "Invalid audio section" }, 400);
+    try {
+      return audioResponse(await clips.get(id, Number(rawIndex)), context.req.header("Range"));
+    } catch (cause) {
+      if (cause instanceof ClipError) return context.json({ error: cause.message }, cause.status);
+      throw cause;
+    }
+  }, { auth: "local" });
+
+  bb.http.route("DELETE", "/clips", (context) => {
+    clips.cancel(context.req.query("id") ?? "");
+    return context.json({ stopped: true });
+  }, { auth: "local" });
 
   function sweepJobs(): void {
     const cutoff = Date.now() - JOB_TTL_MS;

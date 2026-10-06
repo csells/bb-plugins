@@ -16,6 +16,13 @@
     "app.tsx",
     "components",
     "lib",
-    "hooks"
+    "hooks",
+    "clips.ts",
+    "clips.test.ts",
+    "clip-player.ts",
+    "clip-player.test.ts",
+    "app.test.tsx",
+    "synth-socket.test.ts",
+    "vitest.config.ts"
   ]
 }
