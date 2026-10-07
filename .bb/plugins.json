@@ -18,6 +18,10 @@
     {
       "name": "fat-fingers",
       "source": "./plugins/fat-fingers"
+    },
+    {
+      "name": "you-should-know",
+      "source": "./plugins/you-should-know"
     }
   ]
 }

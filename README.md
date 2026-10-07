@@ -51,6 +51,18 @@ layouts are untouched, and diagrams and images inside messages are left alone.
 bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin fat-fingers
 ```
 
+## You Should Know
+
+`plugins/you-should-know` adds a prompt-free second perspective beside a thread.
+Open the right panel, then **+ → You should know**. It only adds consequential
+points the main agent has not already covered; silence is normal. It reviews on
+opening, when work goes idle, and every five minutes during continued activity.
+Hiding the panel stops observation. Uses subscription-authenticated Codex Luna.
+
+```sh
+bb plugin install path:. --plugin you-should-know
+```
+
 Development commands:
 
 ```sh
