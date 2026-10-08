@@ -2,7 +2,7 @@ import { defineRpcContract, type BbPluginApi } from '@get-bb/plugin-sdk';
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
-import { Monitor, type View } from './manager';
+import { Monitor, activityMessages, type View, type Activity } from './manager';
 import { instructions } from './instructions';
 
 // Suppress literal echoes independently of the model's novelty judgment.
@@ -16,7 +16,7 @@ function repeatsAssistant(output:string,transcript:string){
 }
 const input=z.object({threadId:z.string().min(1),lease:z.string().uuid()}).strict();
 const note=z.object({at:z.number(),through:z.number(),text:z.string()});
-const view=z.object({active:z.boolean(),reviewing:z.boolean(),checkedAt:z.number().nullable(),outcome:z.enum(['findings','no-new-findings']).nullable().default(null),nextAt:z.number().nullable(),through:z.number(),coverage:z.string(),error:z.string().nullable(),notes:z.array(note)});
+const view=z.object({active:z.boolean(),reviewing:z.boolean(),checkedAt:z.number().nullable(),outcome:z.enum(['findings','no-new-findings','unchanged']).nullable().default(null),activity:z.array(z.object({id:z.number(),at:z.number(),kind:z.enum(Object.keys(activityMessages) as [Activity['kind'],...Activity['kind'][]])})).max(20).default([]),nextAt:z.number().nullable(),through:z.number(),coverage:z.string(),error:z.string().nullable(),notes:z.array(note)});
 export const contract=defineRpcContract({
   observe:{input,output:view},
   close:{input,output:z.object({ok:z.boolean()})},

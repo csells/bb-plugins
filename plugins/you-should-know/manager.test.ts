@@ -108,3 +108,31 @@ test('a quiet review records its outcome and time, retains findings, and failure
  assert.equal(f.m.state('main').checkedAt,quiet.checkedAt,'failure must not claim a new successful check');
  assert.equal(f.m.state('main').error,'review failed');
 });
+
+
+test('activity records deterministic triggers, actual inference, quiet results, and unchanged checks',async()=>{
+ const f=fixture();f.m.open('main','tab');await flush();
+ assert.deepEqual(f.m.state('main').activity.map(e=>e.kind),['opened','reading','reviewing','findings']);
+ f.change();f.advance(1000);f.m.setSourceActive('main',false);await flush();
+ assert.deepEqual(f.m.state('main').activity.slice(-4).map(e=>e.kind),['idle','reading','reviewing','no-new-findings']);
+ f.m.setSourceActive('main',true);assert.equal(f.m.state('main').activity.at(-1)?.kind,'active');
+ f.advance(INTERVAL);f.m.open('main','tab');await flush();
+ assert.deepEqual(f.m.state('main').activity.slice(-3).map(e=>e.kind),['interval','reading','unchanged']);
+ assert.equal(f.calls(),2,'unchanged snapshot must not claim new inference');
+ assert.equal(f.m.state('main').activity.at(-1)?.at,302000);
+ for(let i=0;i<30;i++){f.m.setSourceActive('main',true);f.m.setSourceActive('main',false);await flush();}
+ assert(f.m.state('main').activity.length<=20,'status history must remain bounded');
+ f.m.close('main','tab');assert.equal(f.m.state('main').activity.at(-1)?.kind,'paused');
+});
+
+test('an idle transition during inference is visibly queued; a failed review is not quiet success',async()=>{
+ let finish:(s:string)=>void;
+ const f=fixture(async()=>new Promise<string>(r=>finish=r));
+ f.m.open('main','tab');await flush();f.change();f.m.setSourceActive('main',false);
+ assert.equal(f.m.state('main').activity.at(-1)?.kind,'idle-queued');
+ finish!('First');await flush();finish!('Second');await flush();
+ assert(f.m.state('main').activity.some(e=>e.kind==='findings'));
+ const failed=fixture(async()=>{throw Error('offline')});failed.m.open('main','tab');await flush();
+ assert.equal(failed.m.state('main').activity.at(-1)?.kind,'failed');
+ assert.equal(failed.m.state('main').checkedAt,null);
+});

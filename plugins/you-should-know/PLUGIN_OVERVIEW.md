@@ -1,4 +1,4 @@
-Open **You should know** beside a conversation to get a quiet, independent perspective without entering a prompt. It adds only consequential information the main agent has not already communicated. When there is nothing to add, it shows **No new findings** with the check time.
+Open **You should know** beside a conversation to get a quiet, independent perspective without entering a prompt. It adds only consequential information the main agent has not already communicated. When there is nothing to add, it shows **No new findings** with the check time. A timestamped activity history shows what triggered each check, when the model is reviewing, and whether the check completed, skipped unchanged content, or failed.
 
 ## How it works
 
