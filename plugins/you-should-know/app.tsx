@@ -32,11 +32,11 @@ function Observer({threadId}:PluginThreadPanelProps){
   },[threadId,rpc]);
   return <section ref={panelRef} className="h-full overflow-y-auto p-4 text-sm" aria-label="You should know perspective">
     <p className="mb-1 font-medium">A second set of eyes</p>
-    <p className="mb-4 text-muted-foreground">Watching this conversation while this panel is open. Checks when work goes idle, or every 5 minutes while active. Adds only consequential points the main agent hasn’t covered; otherwise stays silent.</p>
+    <p className="mb-4 text-muted-foreground">Watching this conversation while this panel is open. Checks when work goes idle, or every 5 minutes while active. Adds only consequential points the main agent hasn’t covered; shows “No new findings” with the check time when there’s nothing to add.</p>
     <div role="status" className="mb-4 text-muted-foreground">
-      {!view?'Connecting to the observer…':view.reviewing?'Reviewing with GPT-6-Sol…':view.checkedAt?`Last checked ${new Date(view.checkedAt).toLocaleTimeString()}`:'Waiting for the first review…'}
+      {!view?'Connecting to the observer…':view.reviewing?'Reviewing with GPT-6-Sol…':view.checkedAt?`${view.outcome==='no-new-findings'?'No new findings · checked at':'Last checked'} ${new Date(view.checkedAt).toLocaleTimeString()}`:'Waiting for the first review…'}
       {view?.nextAt&&!view.reviewing&&<div>Next check {new Date(view.nextAt).toLocaleTimeString()}</div>}
-      {view?.checkedAt&&!view.reviewing&&view.nextAt===null&&<div>Waiting for the conversation to become active.</div>}
+      {view?.checkedAt&&!view.reviewing&&view.nextAt===null&&<div>Waiting for more activity.</div>}
     </div>
     {(error||view?.error)&&<div role="alert" className="mb-4 rounded border border-border p-3 text-destructive">Review unavailable: {error||view?.error}. The next review will retry when work resumes or finishes.</div>}
     <div aria-live="polite" className="space-y-4">

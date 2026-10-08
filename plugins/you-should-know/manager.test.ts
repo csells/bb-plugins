@@ -92,3 +92,19 @@ test('initial idle open reviews once; closed or expired observers ignore source 
  f.m.open('main','tab');await flush();assert.equal(f.calls(),2);
  f.change();f.advance(LEASE_TTL+1);f.m.setSourceActive('main',true);f.m.setSourceActive('main',false);await flush();assert.equal(f.calls(),2);
 });
+
+
+test('a quiet review records its outcome and time, retains findings, and failures stay errors',async()=>{
+ let result:string|null='An earlier finding';
+ const f=fixture(async()=>{if(result==='fail')throw Error('review failed');return result;});
+ f.m.open('main','tab');await flush();
+ assert.equal(f.m.state('main').outcome,'findings');
+ result=null;f.change();f.advance(2000);f.m.setSourceActive('main',false);await flush();
+ const quiet=f.m.state('main');
+ assert.equal(quiet.outcome,'no-new-findings');assert.equal(quiet.checkedAt,3000);
+ assert.equal(quiet.notes.length,1,'quiet checks do not erase previous findings or add empty cards');
+ f.m.restore('restored',{...quiet,key:'2'});assert.equal(f.m.state('restored').outcome,'no-new-findings');
+ result='fail';f.m.setSourceActive('main',true);f.change();f.advance(1000);f.m.setSourceActive('main',false);await flush();
+ assert.equal(f.m.state('main').checkedAt,quiet.checkedAt,'failure must not claim a new successful check');
+ assert.equal(f.m.state('main').error,'review failed');
+});

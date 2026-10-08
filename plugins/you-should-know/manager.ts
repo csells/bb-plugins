@@ -2,7 +2,7 @@ export const INTERVAL = 5 * 60_000;
 export const LEASE_TTL = 90_000;
 export type Snapshot = {key: string; text: string; through: number; coverage: string};
 export type Note = {at: number; through: number; text: string};
-export type View = {active: boolean; reviewing: boolean; checkedAt: number|null; nextAt: number|null; through: number; coverage: string; error: string|null; notes: Note[]};
+export type View = {active: boolean; reviewing: boolean; checkedAt: number|null; outcome: 'findings'|'no-new-findings'|null; nextAt: number|null; through: number; coverage: string; error: string|null; notes: Note[]};
 type RecordState = View & {key: string; sourceActive: boolean; leases: Map<string,number>; job?: AbortController};
 type Adapter = {
   now(): number;
@@ -17,7 +17,7 @@ export class Monitor {
   constructor(adapter: Adapter) {this.adapter=adapter;}
   private record(id:string) {
     let r=this.records.get(id);
-    if(!r){r={active:false,reviewing:false,checkedAt:null,nextAt:null,through:0,coverage:'',error:null,notes:[],key:'',sourceActive:false,leases:new Map()};this.records.set(id,r);}
+    if(!r){r={active:false,reviewing:false,checkedAt:null,outcome:null,nextAt:null,through:0,coverage:'',error:null,notes:[],key:'',sourceActive:false,leases:new Map()};this.records.set(id,r);}
     return r;
   }
   restore(id:string, saved: View & {key:string}) {
@@ -71,7 +71,9 @@ export class Monitor {
       if(snap.key!==r.key){
         const text=await this.adapter.review(id,snap,r.notes,job.signal);
         if(job.signal.aborted)return;
-        if(text && text!==r.notes.at(-1)?.text)r.notes=[...r.notes,{at:this.adapter.now(),through:snap.through,text}].slice(-20);
+        const added=!!text && text!==r.notes.at(-1)?.text;
+        if(added)r.notes=[...r.notes,{at:this.adapter.now(),through:snap.through,text:text!}].slice(-20);
+        r.outcome=added?'findings':'no-new-findings';
         r.key=snap.key;
       }
       r.checkedAt=this.adapter.now();r.through=snap.through;r.coverage=snap.coverage;

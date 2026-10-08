@@ -16,7 +16,7 @@ function repeatsAssistant(output:string,transcript:string){
 }
 const input=z.object({threadId:z.string().min(1),lease:z.string().uuid()}).strict();
 const note=z.object({at:z.number(),through:z.number(),text:z.string()});
-const view=z.object({active:z.boolean(),reviewing:z.boolean(),checkedAt:z.number().nullable(),nextAt:z.number().nullable(),through:z.number(),coverage:z.string(),error:z.string().nullable(),notes:z.array(note)});
+const view=z.object({active:z.boolean(),reviewing:z.boolean(),checkedAt:z.number().nullable(),outcome:z.enum(['findings','no-new-findings']).nullable().default(null),nextAt:z.number().nullable(),through:z.number(),coverage:z.string(),error:z.string().nullable(),notes:z.array(note)});
 export const contract=defineRpcContract({
   observe:{input,output:view},
   close:{input,output:z.object({ok:z.boolean()})},

@@ -8,7 +8,7 @@ The plugin never sends into the watched conversation. It uses hidden, unparented
 
 This is the user-scoped You should know skill applied to a bounded, read-only transcript snapshot: up to 100 recent relevant events / 32,000 characters, with truncation identified. It includes user requests, completed assistant messages and command outcomes; raw command text and tool output are excluded. It does not inspect repository artifacts or guarantee a full-thread audit. Earlier context may be missing. Transcript claims are not proof of deployment or testing.
 
-The latest 20 distinct perspectives persist per source thread. Only consequential information the main agent has not already communicated qualifies for a note. Paraphrases, reminders, recaps and all-clears are excluded. No note is added when nothing is missing, including the first review or an empty conversation. The panel records when it checked and the last included event.
+The latest 20 distinct perspectives persist per source thread. Only consequential information the main agent has not already communicated qualifies for a note. Paraphrases, reminders, recaps and all-clears are excluded. No note is added when nothing is missing, including the first review or an empty conversation. After a quiet review, the panel shows **No new findings** with the check time. This status replaces the previous check status without adding a finding card; earlier findings remain visible. The panel also records the last included event.
 
 ## Development
 
