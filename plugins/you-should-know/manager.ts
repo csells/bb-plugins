@@ -48,7 +48,11 @@ export class Monitor {
     const r=this.record(id);r.leases.delete(lease);
     if(!r.leases.size)this.stop(r);
   }
-  private stop(r:RecordState){r.active=false;r.nextAt=null;r.job?.abort();r.reviewing=false;}
+  private stop(r:RecordState){
+    // Losing visibility pauses scheduling, not the bounded review already paid for.
+    // A returning panel reconnects to that job instead of repeatedly restarting it.
+    r.active=false;r.nextAt=null;
+  }
   tick(){
     if(this.disposed)return;
     const now=this.adapter.now();
@@ -75,5 +79,5 @@ export class Monitor {
     }catch(error){if(!job.signal.aborted)r.error=error instanceof Error?error.message:String(error);}
     finally{if(r.job===job){r.job=undefined;r.reviewing=false;this.tick();}}
   }
-  dispose(){this.disposed=true;for(const r of this.records.values()){r.leases.clear();this.stop(r);}}
+  dispose(){this.disposed=true;for(const r of this.records.values()){r.leases.clear();this.stop(r);r.job?.abort();r.reviewing=false;}}
 }

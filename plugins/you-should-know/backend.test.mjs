@@ -25,7 +25,7 @@ test('reviews use hidden unparented workers, personal workspace, and never send 
   assert.equal(a.visibility,'hidden');assert.equal(a.parentThreadId,undefined);
   assert.equal(a.lifecycleOwnerThreadId,'main');assert.equal(a.projectId,'personal');
   assert.deepEqual(a.environment,{type:'host',workspace:{type:'personal'}});
-  assert.equal(a.model,'gpt-6-luna');
+  assert.equal(a.model,'gpt-6-sol');
   assert.equal(host.harness.inspection.sdk.callsTo('threads.send').length,0);
   assert.equal(host.harness.inspection.sdk.callsTo('threads.stop').length,1);
   assert.equal(host.harness.inspection.sdk.callsTo('threads.archive').length,1);

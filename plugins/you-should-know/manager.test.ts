@@ -29,19 +29,28 @@ test('five minutes throttle changes; different source threads stay separate', as
   f.advance(1); f.m.tick(); await flush(); assert.equal(f.calls(),3);
   assert.equal(f.m.state('b').through,2);
 });
-test('last close cancels in-flight review and discards late result', async () => {
-  let signal: AbortSignal; let finish: (s:string)=>void;
-  const f=fixture(async (_id:any,_snap:any,_previous:any,s:AbortSignal)=>{signal=s;return new Promise<string>(r=>finish=r)});
-  f.m.open('main','a'); f.m.open('main','b'); await flush();
-  f.m.close('main','a'); assert.equal(signal!.aborted,false);
-  f.m.close('main','b'); assert.equal(signal!.aborted,true);
-  finish!('late result'); await flush(); assert.equal(f.m.state('main').notes.length,0);
+test('switching panels preserves the running review and reuses it on return',async()=>{
+ let signal:AbortSignal;let finish:(s:string)=>void;let calls=0;
+ const f=fixture(async(_id:any,_snap:any,_previous:any,s:AbortSignal)=>{calls++;signal=s;return new Promise<string>(r=>finish=r)});
+ f.m.open('main','a');await flush();f.m.close('main','a');
+ assert.equal(signal!.aborted,false,'a brief panel switch must not cancel inference');
+ f.m.open('main','b');await flush();assert.equal(calls,1);
+ finish!('A new consequential finding');await flush();
+ assert.equal(f.m.state('main').notes.length,1);assert.equal(f.m.state('main').reviewing,false);assert.equal(calls,1);
 });
-test('disconnected browser expires, stops reviewer, and cannot keep spending', async () => {
-  let signal: AbortSignal;
-  const f=fixture(async (_a:any,_b:any,_c:any,s:AbortSignal)=>{signal=s;return new Promise(()=>{})});
-  f.m.open('main','a'); await flush(); f.advance(LEASE_TTL+1); f.m.tick();
-  assert.equal(signal!.aborted,true); assert.equal(f.m.state('main').active,false);
+test('hidden or disconnected panel lets one review finish but schedules no more',async()=>{
+ let signal:AbortSignal;let finish:(s:string)=>void;let calls=0;
+ const f=fixture(async(_a:any,_b:any,_c:any,s:AbortSignal)=>{calls++;signal=s;return new Promise<string>(r=>finish=r)});
+ f.m.open('main','a');await flush();f.advance(LEASE_TTL+1);f.m.tick();
+ assert.equal(signal!.aborted,false);assert.equal(f.m.state('main').active,false);
+ finish!('Completed while away');await flush();f.change();f.advance(INTERVAL*2);f.m.tick();await flush();
+ assert.equal(calls,1);assert.equal(f.m.state('main').notes[0].text,'Completed while away');assert.equal(f.m.state('main').nextAt,null);
+});
+test('plugin shutdown still cancels inference and discards a late result',async()=>{
+ let signal:AbortSignal;let finish:(s:string)=>void;
+ const f=fixture(async(_a:any,_b:any,_c:any,s:AbortSignal)=>{signal=s;return new Promise<string>(r=>finish=r)});
+ f.m.open('main','a');await flush();f.m.dispose();assert.equal(signal!.aborted,true);
+ finish!('Late');await flush();assert.equal(f.m.state('main').notes.length,0);
 });
 test('errors are visible and retry at cadence; dispose cancels work', async()=>{
   let fail=true;

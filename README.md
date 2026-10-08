@@ -57,7 +57,7 @@ bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin fat
 Open the right panel, then **+ → You should know**. It only adds consequential
 points the main agent has not already covered; silence is normal. It reviews on
 opening, when work goes idle, and every five minutes during continued activity.
-Hiding the panel stops observation. Uses subscription-authenticated Codex Luna.
+Hiding the panel pauses new reviews; an in-flight review finishes and is saved. Uses subscription-authenticated Codex Sol.
 
 ```sh
 bb plugin install path:. --plugin you-should-know

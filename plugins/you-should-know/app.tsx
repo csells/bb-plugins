@@ -34,7 +34,7 @@ function Observer({threadId}:PluginThreadPanelProps){
     <p className="mb-1 font-medium">A second set of eyes</p>
     <p className="mb-4 text-muted-foreground">Watching this conversation while this panel is open. Checks when work goes idle, or every 5 minutes while active. Adds only consequential points the main agent hasn’t covered; otherwise stays silent.</p>
     <div role="status" className="mb-4 text-muted-foreground">
-      {!view||view.reviewing?'Reading the conversation…':view.checkedAt?`Last checked ${new Date(view.checkedAt).toLocaleTimeString()}`:'Waiting for the first review…'}
+      {!view?'Connecting to the observer…':view.reviewing?'Reviewing with GPT-6-Sol…':view.checkedAt?`Last checked ${new Date(view.checkedAt).toLocaleTimeString()}`:'Waiting for the first review…'}
       {view?.nextAt&&!view.reviewing&&<div>Next check {new Date(view.nextAt).toLocaleTimeString()}</div>}
       {view?.checkedAt&&!view.reviewing&&view.nextAt===null&&<div>Waiting for the conversation to become active.</div>}
     </div>

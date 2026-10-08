@@ -2,9 +2,9 @@ Open **You should know** beside a conversation to get a quiet, independent persp
 
 ## How it works
 
-While visible, the panel reviews on opening and when the main thread goes idle. New activity starts a five-minute countdown; another idle transition triggers a review sooner. Continued activity is checked every five minutes. Hiding the panel stops observation.
+While visible, the panel reviews on opening and when the main thread goes idle. New activity starts a five-minute countdown; another idle transition triggers a review sooner. Continued activity is checked every five minutes. Hiding the panel pauses new reviews; an in-flight review finishes and is saved.
 
-Findings remain in the panel. The observer does not send messages to the main conversation. It uses hidden Codex Luna reviewers with separate personal workspaces and retains the latest twenty findings per thread.
+Findings remain in the panel. The observer does not send messages to the main conversation. It uses hidden Codex Sol reviewers with separate personal workspaces and retains the latest twenty findings per thread.
 
 ## Requirements and limits
 
