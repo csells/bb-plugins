@@ -8,4 +8,4 @@ Findings remain in the panel. The observer does not send messages to the main co
 
 ## Requirements and limits
 
-Requires BB 0.43.4 or newer and a subscription-authenticated Codex CLI on the BB execution host. Reviews consume your Codex subscription usage. The observer reads a bounded recent transcript, not repository artifacts, and labels its coverage. Novelty and significance are model judgments; it can miss things.
+Requires BB 0.43.4 or newer and a subscription-authenticated Codex CLI on the BB execution host. Reviews consume your Codex subscription usage. The observer keeps early and recent user requests separately from recent activity, includes bounded command/output evidence with credential-pattern redaction, and labels its coverage. It does not inspect repository artifacts. Novelty and significance are model judgments; it can miss things.

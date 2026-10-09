@@ -83,3 +83,25 @@ test('first review stays silent when nothing is missing; empty conversations cre
   assert.equal(host.harness.inspection.sdk.callsTo('threads.spawn').length,2);
  }finally{await host.harness.lifecycle.dispose();}
 });
+
+
+test('review retains user constraints outside the tool window and includes redacted tool evidence',async()=>{
+ const request=(seq,text)=>({seq,type:'client/turn/requested',data:{initiator:'user',input:[{type:'text',text}]}});
+ const host=createFakePluginHost({pluginId:'you-should-know',sdk:{
+  projects:{list:async()=>[{id:'personal',kind:'personal'}]},
+  threads:{get:async({threadId})=>makeThreadResponse({id:threadId}),
+   events:{list:async args=>args.types?.length===1&&args.types[0]==='client/turn/requested'
+    ?[request(args.order==='asc'?1:400,args.order==='asc'?'Keep customer data intact.':'Do not deploy before the rollback test passes.')]
+    :[{seq:501,type:'item/completed',data:{item:{type:'agentMessage',text:'All checks passed; ready to deploy.'}}},
+      {seq:500,type:'item/completed',data:{item:{type:'commandExecution',command:'npm test',status:'completed',exitCode:0,aggregatedOutput:'rollback test: 4 failed, 12 passed\nAPI_KEY=fake-private-value'}}}]},
+   spawn:async()=>makeThreadResponse({id:'context-review'}),wait:async()=>({matched:true}),output:async()=>({output:'The rollback test failed despite the completion claim [seq 500].'}),stop:async()=>({ok:true}),archive:async()=>({ok:true})}
+ }});
+ try{
+  await plugin(host.bb);await host.harness.behavior.callRpc('observe',{threadId:'main',lease:'11111111-1111-4111-8111-111111111111'});await flush();
+  const prompt=host.harness.inspection.sdk.callsTo('threads.spawn')[0][0].prompt;
+  assert.match(prompt,/Keep customer data intact/);
+  assert.match(prompt,/Do not deploy before the rollback test passes/);
+  assert.match(prompt,/npm test/);assert.match(prompt,/4 failed, 12 passed/);
+  assert.doesNotMatch(prompt,/fake-private-value/);
+ }finally{await host.harness.lifecycle.dispose();}
+});
