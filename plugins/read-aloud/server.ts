@@ -678,7 +678,7 @@ export default async function plugin(bb: BbPluginApi) {
               exitCode: 1,
               stderr: [
                 `synthesis unreachable: ${cause instanceof Error ? cause.message : String(cause)}`,
-                "If this looks like a refused handshake, bump CHROMIUM_VERSION in synth.ts.",
+                "A 403 at every client version means the token scheme changed again (see gec.ts).",
               ].join("\n"),
             };
           }

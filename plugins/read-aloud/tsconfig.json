@@ -12,6 +12,8 @@
     "server.ts",
     "synth.ts",
     "synth.test.ts",
+    "gec.ts",
+    "gec.test.ts",
     "server.test.ts",
     "app.tsx",
     "components",

@@ -40,11 +40,19 @@ global, and read once per load.
 
 ## How it works
 
-**Native synthesis.** `synth.ts` implements the protocol in about forty lines:
-the `Sec-MS-GEC` token (SHA-256 of the current Windows FILETIME rounded to a
-five-minute boundary, which must be computed with `BigInt` — the tick count
-exceeds `Number.MAX_SAFE_INTEGER` and floating point silently hashes to a
-rejected token), the WebSocket handshake, and the binary framing. The only
+**Native synthesis.** `synth.ts` implements the protocol: the `Sec-MS-GEC`
+token (derived from the current Windows FILETIME rounded to a five-minute
+boundary, which must be computed with `BigInt` — the tick count exceeds
+`Number.MAX_SAFE_INTEGER` and floating point silently hashes to a rejected
+token), the WebSocket handshake, and the binary framing.
+
+In October 2026 the service retired the v1 token, a plain SHA-256 of that
+string, and began refusing every handshake with 403 at every client version.
+`gec.ts` ports the v2 token from the reference `edge-tts` client (7.3.0): a
+SHA-256 behind a secret prefix, resumed from a published midstate, plus a keyed
+"CS64" checksum, sent as `Sec-MS-GEC-Version: 2-<version>` with a random
+`muid` cookie. Version escalation cannot recover from a scheme change like
+this; `bb read-aloud status` reporting 403 at every version is the signature. The only
 dependency is `ws`, needed because the browser WebSocket API cannot set the
 `Origin`/`User-Agent` headers the service checks.
 
@@ -184,3 +192,10 @@ drops its text label first on narrow screens so the controls always fit.
 
 Highlight text inside a message and the action also appears in the selection
 menu, reading only what you highlighted.
+
+### Third-party notices
+
+`gec.ts` is a TypeScript adaptation of `edge-tts` 7.3.0's `drm.py` and
+retains its LGPLv3 license. Its source link and modification notice are in
+the file header; upstream notices and license terms are in `licenses/`.
+The repository's MIT license applies to the other original plugin code.

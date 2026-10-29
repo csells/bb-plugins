@@ -30,8 +30,9 @@
 // itself", and is why edge-tts-node's hard pin at 130 is permanently broken
 // while this is not.
 // ---------------------------------------------------------------------------
-import { createHash, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import WebSocket from "ws";
+import { gecV2 } from "./gec";
 
 /** Published client token shared by every Read Aloud client. */
 const TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
@@ -93,8 +94,10 @@ export function candidateVersions(): string[] {
 }
 
 /**
- * The Sec-MS-GEC token: SHA-256 of the current Windows FILETIME rounded down to
- * a five-minute boundary, concatenated with the trusted client token.
+ * The Sec-MS-GEC token, from the current Windows FILETIME rounded down to a
+ * five-minute boundary, concatenated with the trusted client token. Since
+ * October 2026 the service only accepts the v2 form (see gec.ts); the v1 form,
+ * a plain SHA-256 of the same string, now draws 403 at every client version.
  *
  * BigInt is not optional here. The tick count is ~1.3e17, well past
  * Number.MAX_SAFE_INTEGER, so computing it in floating point silently loses
@@ -104,14 +107,12 @@ function secMsGec(): string {
   const unixSeconds = BigInt(Math.floor(Date.now() / 1000));
   const ticks = (unixSeconds + WINDOWS_EPOCH_OFFSET_SECONDS) * 10_000_000n;
   const rounded = ticks - (ticks % FIVE_MINUTES_IN_TICKS);
-  return createHash("sha256")
-    .update(`${rounded}${TRUSTED_CLIENT_TOKEN}`)
-    .digest("hex")
-    .toUpperCase();
+  return gecV2(`${rounded}${TRUSTED_CLIENT_TOKEN}`);
 }
 
+/** The "2-" names the token scheme; the version after it is negotiated. */
 function authQuery(version: string): string {
-  return `Sec-MS-GEC=${secMsGec()}&Sec-MS-GEC-Version=1-${version}`;
+  return `Sec-MS-GEC=${secMsGec()}&Sec-MS-GEC-Version=2-${version}`;
 }
 
 /** Headers the service checks on the upgrade request. */
@@ -130,6 +131,8 @@ function handshakeHeaders(version: string): Record<string, string> {
     "Sec-CH-UA": `" Not;A Brand";v="99", "Microsoft Edge";v="${major}", "Chromium";v="${major}"`,
     "Sec-CH-UA-Mobile": "?0",
     "Sec-CH-UA-Platform": '"Windows"',
+    // A fresh random machine id per connection, as the reference client sends.
+    Cookie: `muid=${randomBytes(16).toString("hex").toUpperCase()};`,
   };
 }
 
