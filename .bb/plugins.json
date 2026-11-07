@@ -22,6 +22,10 @@
     {
       "name": "you-should-know",
       "source": "./plugins/you-should-know"
+    },
+    {
+      "name": "open-in-window",
+      "source": "./plugins/open-in-window"
     }
   ]
 }
