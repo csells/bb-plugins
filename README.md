@@ -51,6 +51,16 @@ layouts are untouched, and diagrams and images inside messages are left alone.
 bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin fat-fingers
 ```
 
+## Open in Window
+
+`plugins/open-in-window` adds **Open in new window** to every thread's actions
+menu: the sidebar row's "..." menu, its right-click menu, and the thread
+header's menu. It opens that thread the way a `target="_blank"` link does.
+
+```sh
+bb plugin install git:https://github.com/csells/bb-plugins.git@main --plugin open-in-window
+```
+
 ## You Should Know
 
 `plugins/you-should-know` adds a prompt-free second perspective beside a thread.
