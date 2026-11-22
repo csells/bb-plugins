@@ -8,8 +8,9 @@ preferred candidate, with latency and perceived noise still unresolved.
 
 Start with the [reconciliation and next work](analysis/jarvis-plan-reconciliation-2026-11-22.md).
 It distinguishes source implementation, historical staging evidence, unmet
-requirements and the work needed to resume. Staging availability was not checked
-on November 22; old review links are not current health evidence.
+requirements and the work needed to resume. A later [Mac cleanup](research/jarvis-mac-cleanup-2026-11-22.md) unloaded obsolete
+local staging jobs and confirmed registry retention of the remote VMs. Review
+access must be re-established; old review links are not current health evidence.
 
 - [Product vision](vision/jarvis.md): the intended experience and boundaries.
 - [Active plans](plans/README.md): all five remain active; none is ready to archive.

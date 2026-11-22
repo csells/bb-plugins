@@ -183,3 +183,11 @@ or reachable. Stable remains outside candidate changes. No merge or promotion is
 approved by this record. After explicit approval and production verification,
 preserve evidence/rollback artifacts and remove dedicated staging resources as
 required by the global service-development rules.
+
+
+Operational update later on November 22: fresh registry records establish
+November 21 operator retention of VM100/VM222. The [Mac cleanup](../research/jarvis-mac-cleanup-2026-11-22.md)
+unloaded five obsolete local staging jobs; both remote VMs and the shared voice
+service were preserved. Re-establish the relay/tunnels and valid credentials
+before claiming the review path works. This supersedes the earlier unknown
+retention state, but is not a fresh remote-VM functional test.

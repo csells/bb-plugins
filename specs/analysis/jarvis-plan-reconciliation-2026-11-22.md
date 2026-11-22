@@ -23,6 +23,15 @@ none is archived and every remainder stays in its original active plan. No
 repository AGENTS.md or equivalent needed updating; global staging rules remain
 applicable and unchanged.
 
+## Later same-day operational update
+
+The [Mac cleanup](../research/jarvis-mac-cleanup-2026-11-22.md) subsequently read
+fresh registry state: Chris retained VM100 and VM222 on November 21, superseding
+the old VM review expiry. Both were preserved. Five obsolete Mac staging jobs
+were unloaded at his request; review access must be deliberately re-established
+with valid credentials before further tests. The expiry discussion below is the
+original documentation-only baseline, not authority to delete retained VMs.
+
 ## Where work stopped
 
 | Issue | Last evidence | Disposition |
