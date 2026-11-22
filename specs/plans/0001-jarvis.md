@@ -1,8 +1,20 @@
 # Jarvis plugin delivery plan
 
-Status: implementation authorized by Chris on 2026-11-14; targeted source research complete; initial typed coordination panel rejected as insufficient; hands-free briefing, watching, and exact-question answer flow now undergoing real-session acceptance in disposable staging. Chris required this review before implementation code. Promotion remains gated on approval of the staged candidate. See [staging preflight](../research/jarvis-staging-preflight.md) for verified constraints and the approved staging decision.
+Status: active — reconciled 2026-11-22 against unmerged implementation `08a9fe9`. Partial Slice A/B candidate exists; voice and real-task acceptance remain unmet. No promotion approved.
+
+Current evidence and every remaining acceptance area are recorded in the
+[November 22 reconciliation](../analysis/jarvis-plan-reconciliation-2026-11-22.md).
+The [architecture record](../architecture/0001-jarvis-current-design.md) describes
+what is built. Historical staging statements below are dated evidence, not a
+claim that staging is available today. Unchecked acceptance items remain unmet;
+partial implementation does not check them off.
 
 Vision: [Jarvis for BB](../vision/jarvis.md).
+
+Implementation was authorized November 14 after the requested source research.
+The initial typed coordination panel was rejected as insufficient. The approved
+restricted-relay staging decision is preserved in the
+[staging preflight](../research/jarvis-staging-preflight.md).
 
 ## Foundation and reuse
 
@@ -23,7 +35,23 @@ Use the [bootstrap decisions and reuse ledger](../research/jarvis-bootstrap-deci
 
 Detailed implementation and acceptance criteria are in [conversation and speech](0002-jarvis-conversation-and-speech.md), [coordination, control, and memory](0003-jarvis-coordination-and-memory.md), and [events and scheduled follow-ups](0004-jarvis-events-and-scheduled-follow-ups.md). The specification phase changed no service code or stable installation. Implementation now follows the staging gate below.
 
-## Pocket discovery and verification — 2026-11-14
+## Current implementation decisions — reconciled 2026-11-22
+
+The authorized LiveKit spike and integration superseded Pipecat as the active
+media path on November 15. Chris subsequently preferred self-hosted CosyVoice's
+Alfred-reference voice; Pocket is retained as a baseline/optional adapter, not
+the current staging default. This preference does not accept CosyVoice noise,
+latency or interruption behavior. Pocket-specific availability/lease requirements
+below still apply if that adapter is offered; they do not establish CosyVoice
+acceptance. The common voice requirements and release gates remain unchanged.
+
+The current talker uses model-only inference through the BB host's account pool,
+not the dedicated BB talker thread proposed below. Its bounded journal and typed
+control boundary exist; provider selection UI, BB conversation persistence and
+selected-session/memory context are not equivalent or complete. This deviation
+is recorded, not counted as delivery of the original talker contract.
+
+## Pocket discovery and verification — 2026-11-14 (historical baseline)
 
 Authoritative discovery: central registry record `voice`, revision 15, plus the installed managed service client and Alfred runbook. Discover live addresses and credentials through that record at implementation time; do not embed an administrator secret in the plugin or browser.
 

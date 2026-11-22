@@ -1,6 +1,17 @@
 # Jarvis events and scheduled follow-ups
 
-Status: planned, Slice D; outside the initial release. Parent: [delivery plan](0001-jarvis.md). Builds on [coordination and memory](0003-jarvis-coordination-and-memory.md) and [conversation and speech](0002-jarvis-conversation-and-speech.md). Product outcome: Jarvis notices relevant changes and follows up on commitments without a fresh utterance.
+Status: active, planned Slice D — reconciled 2026-11-22; no external-event or scheduled-review journey implemented. Outside the initial release. Parent: [delivery plan](0001-jarvis.md).
+
+Current evidence and every remaining acceptance area are recorded in the
+[November 22 reconciliation](../analysis/jarvis-plan-reconciliation-2026-11-22.md).
+The [architecture record](../architecture/0001-jarvis-current-design.md) describes
+what is built. Historical staging statements below are dated evidence, not a
+claim that staging is available today. Unchecked acceptance items remain unmet;
+partial implementation does not check them off.
+
+Builds on [coordination and memory](0003-jarvis-coordination-and-memory.md) and
+[conversation and speech](0002-jarvis-conversation-and-speech.md). Product outcome:
+Jarvis notices relevant changes and follows up on commitments without a fresh utterance.
 
 ## Scope and capability gate
 

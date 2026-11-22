@@ -1,5 +1,12 @@
 # Jarvis requirement-to-evidence matrix — 2026-11-15
 
+Current-reading note (2026-11-22): this is a dated assessment. Subsequent fixes
+cover startup reservation cleanup, controls during speech/preparation, independent
+text fallback and close-error recovery. See the
+[plan reconciliation and next steps](../analysis/jarvis-plan-reconciliation-2026-11-22.md)
+for their exact evidence and the remaining gates. The full voice/control roadmap
+is still incomplete; old staging links are not current health checks.
+
 Candidate: `274acbf`. These are 54 scenario families, not 54 passing tests. A narrow pass does not close its entire family. `unit-only` means the full browser/real-service journey is not established. `not-implemented` is an open gate, never a skipped pass.
 
 Sources: vision, plans 0001–0005, original awesome-Jarvis blueprint. See [audit](jarvis-full-gap-analysis-2026-11-15.md) for measured results and priorities. The [JSON catalog](evidence/jarvis-scenario-coverage-2026-11-15.json) retains code anchors.

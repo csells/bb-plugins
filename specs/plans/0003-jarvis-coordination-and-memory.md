@@ -1,6 +1,16 @@
 # Jarvis coordination, control, and memory
 
-Status: planned. Parent: [delivery plan](0001-jarvis.md). Depends on BB SDK capability validation; supplies the control contract for [conversation and speech](0002-jarvis-conversation-and-speech.md).
+Status: active — reconciled 2026-11-22. Coordination is partially implemented and narrowly verified; domain authority, broader recovery and staff presentation remain incomplete. Personal memory and sourced recall are unimplemented. Parent: [delivery plan](0001-jarvis.md).
+
+Current evidence and every remaining acceptance area are recorded in the
+[November 22 reconciliation](../analysis/jarvis-plan-reconciliation-2026-11-22.md).
+The [architecture record](../architecture/0001-jarvis-current-design.md) describes
+what is built. Historical staging statements below are dated evidence, not a
+claim that staging is available today. Unchecked acceptance items remain unmet;
+partial implementation does not check them off.
+
+Depends on BB SDK capability validation and supplies the control contract for
+[conversation and speech](0002-jarvis-conversation-and-speech.md).
 
 ## Outcome
 

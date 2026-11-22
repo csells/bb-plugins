@@ -1,5 +1,14 @@
 # First integrated LiveKit candidate
 
+Status: active — reconciled 2026-11-22. Integration implemented on unmerged branch; portable lifecycle, latency, audio quality and full device/control acceptance remain open.
+
+Current evidence and every remaining acceptance area are recorded in the
+[November 22 reconciliation](../analysis/jarvis-plan-reconciliation-2026-11-22.md).
+The [architecture record](../architecture/0001-jarvis-current-design.md) describes
+what is built. Historical staging statements below are dated evidence, not a
+claim that staging is available today. Unchecked acceptance items remain unmet;
+partial implementation does not check them off.
+
 Authorized by Chris on 2026-11-15 after the successful Android spike.
 Stable stays unchanged; the actual candidate runs in disposable staging.
 
@@ -25,7 +34,7 @@ Evidence goes in specs/research/. Existing research remains historical. A succes
 integration does not complete memory, recall, scheduled reviews or external event
 milestones. No production promotion follows without review of this candidate.
 
-Current status: the integrated candidate is implemented and staged. Real BB
+Historical November 15 status: the integrated candidate was implemented and staged. Real BB
 worker delegation, named automatic announcement, exact directed answer and
 steering are verified; quiet mode, startup cancellation, service restart and
 microphone-denied text/audio fallback are verified in the panel.
@@ -73,3 +82,23 @@ Stock-text comparison is now staged at Chris's request: Start skips briefing
 inference and synthesizes identical text afresh. Warm click-to-audio remains
 2.1–4.0 seconds; Qwen is re-enabled for this comparison with its reliability
 warning, not accepted for production. See the [stock briefing results](../research/jarvis-stock-briefing-2026-11-15.md).
+
+## Latest disposition — 2026-11-22
+
+Chris prefers CosyVoice. Light noise cleanup is implemented, but perceived-noise
+acceptance is still open. The Qwen End/restart reservation failure and the
+What needs me during speech failure have bounded regression evidence. The
+subsequent [all-controls audit](../research/jarvis-control-audit-2026-11-15.md)
+exercised all 14 buttons in 29 browser checks, then retested the three affected
+recovery checks after its final UI fix. It did not rerun the complete suite after
+that last fix. Latest recorded component coverage is 57 plugin + 17 companion
+tests, not an end-to-end release result.
+
+The [noise/control](../research/jarvis-cosy-controls-noise-2026-11-15.md),
+[start recovery](../research/jarvis-start-recovery-2026-11-15.md) and
+[streaming audit](../research/jarvis-streaming-api-audit-2026-11-15.md) preserve the
+boundary between fixed defects and open acceptance. Next: revalidate disposable
+staging, implement and measure real streaming CosyVoice with brisk pace, remove
+full-response buffering, then run complete control and repeated-interruption
+qualification on the exact candidate. Full steps and later roadmap remain in the
+reconciliation; this plan stays active.

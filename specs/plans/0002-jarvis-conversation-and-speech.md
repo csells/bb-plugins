@@ -1,6 +1,13 @@
 # Jarvis conversation and speech
 
-Status: implementation and real-service voice-path acceptance in progress; see [integration evidence](../research/jarvis-hands-free-integration.md). Parent: [delivery plan](0001-jarvis.md). Product contract: [vision](../vision/jarvis.md).
+Status: active — reconciled 2026-11-22. LiveKit conversation exists; startup latency fails, voice quality is not accepted, and full desktop/phone conversation qualification remains unmet. Parent: [delivery plan](0001-jarvis.md).
+
+Current evidence and every remaining acceptance area are recorded in the
+[November 22 reconciliation](../analysis/jarvis-plan-reconciliation-2026-11-22.md).
+The [architecture record](../architecture/0001-jarvis-current-design.md) describes
+what is built. Historical staging statements below are dated evidence, not a
+claim that staging is available today. Unchecked acceptance items remain unmet;
+partial implementation does not check them off.
 
 ## Outcome and dependencies
 
@@ -48,11 +55,40 @@ Acquire when an active conversation needs speech capacity, renew before expiry, 
 
 Resolve the observed public-path 502 from the staging VM using verified TLS and current registry routes. Local synthesis success alone is insufficient. Shared-service changes, if needed, require their own disposable candidate and explicit promotion approval.
 
-## Mobile browser transport decision (2026-11-14)
+## Mobile browser transport decision — current as of 2026-11-22
 
-The [fifteen-project mobile duplex source review](../research/mobile-duplex-source-synthesis.md) selects Pipecat SmallWebRTC plus its server voice pipeline as the next implementation candidate. Retain BB orchestration, configured STT and Alfred; replace normal browser16k capture/utterance upload/sentence-WAV playback with a native microphone RTP track, server-side processing and persistent remote-track playback. Qwen's isolated Node WebRTC media layer is the fallback donor if this integration is impractical. This is a source-backed selection, not a completed migration or phone/car acceptance result.
+The authorized [LiveKit spike](../research/jarvis-livekit-spike.md) and
+[November 15 integration](0005-jarvis-livekit-integration.md) replaced the earlier
+Pipecat SmallWebRTC candidate. The active implementation is the Node/TypeScript
+LiveKit companion, a browser microphone RTP track and persistent remote audio.
+The remote endpoint requirement remains: implement and verify reachable ICE/TURN,
+request cancellation, queued-audio draining, stale-generation suppression and
+honest delivered-text accounting. A one-browser/two-peer spike does not satisfy
+real remote media, interruption or reconnect acceptance.
 
-The existing one-browser/two-peer spike does not satisfy real remote media, interruption or reconnect acceptance. Implement and verify the actual VM endpoint with reachable ICE/TURN, request cancellation, queued-audio draining, stale-generation suppression and honest delivered-text accounting. Keep the original hands-free, microphone-off announcement, background limitation and latency requirements. Do not make further engineering contingent on Chris interpreting another diagnostic matrix; document physical-device observations separately from automated verification.
+BB remains the execution authority. Pipecat and the older browser playback
+experiments are historical research, not alternate completed production paths.
+
+BB supplies batch transcription; the host relay supplies model-only inference.
+Self-hosted CosyVoice is the preferred voice candidate after Chris's comparison;
+Pocket is a baseline/optional adapter. Qwen and CosyVoice Python inference stays
+outside the TypeScript plugin. No hosted TTS API key is required for these spikes.
+
+The current session uses VAD turn detection, not the semantic end-of-turn behavior
+required above. The model and local synthesis paths buffer complete responses
+and phrases. True incremental synthesis, brisk streaming tempo, natural-turn
+calibration and sustained physical Android/car qualification remain unmet.
+Stock-text Start isolates synthesis/startup; Brief me still uses real BB context.
+Neither path meets Chris's additional **Start-to-first-spoken-audio <1 second**
+gate. Keep that gate alongside the turn-response and interruption targets below.
+
+The original dedicated BB talker thread and full provider-selection experience
+remain unmet by the direct model adapter. See the current architecture for this
+explicit deviation. Retain all common speech, microphone-off, delivery-generation,
+recovery and acceptance requirements; apply Pocket lease/public-path checks only
+when qualifying the Pocket adapter. Do not require Chris to interpret another
+ambiguous diagnostic matrix: report physical observations separately from
+browser automation and measured acceptance gates.
 
 ## Source-backed bootstrap
 

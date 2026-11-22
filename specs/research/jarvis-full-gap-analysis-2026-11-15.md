@@ -1,5 +1,12 @@
 # Jarvis: implementation, blueprint and acceptance gaps
 
+Current-reading note (2026-11-22): this is a dated assessment. Subsequent fixes
+cover startup reservation cleanup, controls during speech/preparation, independent
+text fallback and close-error recovery. See the
+[plan reconciliation and next steps](../analysis/jarvis-plan-reconciliation-2026-11-22.md)
+for their exact evidence and the remaining gates. The full voice/control roadmap
+is still incomplete; old staging links are not current health checks.
+
 Assessment: 2026-11-15. Candidate: `274acbf0faccc9c8faf941100e8606e1c113d94a`.
 All 65 tracked plugin files match the disposable VM source. The original
 `awesome-jarvis/blueprint.md` is unchanged from the pinned `0378a680` version.
